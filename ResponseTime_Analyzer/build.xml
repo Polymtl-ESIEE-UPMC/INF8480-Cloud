@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build-jar" name="TP1">
+	<property name="debuglevel" value="source,lines,vars" />
+	<path id="TP1.classpath">
+		<pathelement location="bin" />
+	</path>
+	<target name="init">
+		<mkdir dir="bin" />
+		<copy includeemptydirs="false" todir="bin">
+			<fileset dir="src">
+				<exclude name="**/*.java" />
+			</fileset>
+		</copy>
+	</target>
+	<target name="clean">
+		<delete dir="bin" />
+		<delete file="server.jar" />
+		<delete file="client.jar" />
+		<delete file="shared.jar" />
+	</target>
+	<target depends="init" name="build-class">
+		<javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false">
+			<src path="src" />
+			<classpath refid="TP1.classpath" />
+		</javac>
+	</target>
+	<target depends="build-class" name="build-jar">
+		<jar destfile="shared.jar" basedir="bin" includes="ca/polymtl/inf8480/tp1/shared/**" update="false" />
+		<jar destfile="server.jar" basedir="bin" includes="ca/polymtl/inf8480/tp1/server/**" update="false" />
+		<jar destfile="client.jar" basedir="bin" includes="ca/polymtl/inf8480/tp1/client/**" update="false" />
+	</target>
+</project>
