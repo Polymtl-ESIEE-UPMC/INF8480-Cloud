@@ -9,11 +9,15 @@ import java.rmi.registry.Registry;
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 
 public class Client {
+	static int size;
+	static byte[] param;
 	public static void main(String[] args) {
 		String distantHostname = null;
 
 		if (args.length > 0) {
 			distantHostname = args[0];
+			size = Integer.parseInt(args[1]);
+			param = new byte[(int)(Math.pow(10, size))];
 		}
 
 		Client client = new Client(distantHostname);
@@ -41,6 +45,7 @@ public class Client {
 	}
 
 	private void run() {
+		
 		appelNormal();
 
 		if (localServerStub != null) {
@@ -72,23 +77,23 @@ public class Client {
 
 	private void appelNormal() {
 		long start = System.nanoTime();
-		int result = localServer.execute(4, 7);
+		localServer.empty(param, param);
 		long end = System.nanoTime();
 
 		System.out.println("Temps écoulé appel normal: " + (end - start)
 				+ " ns");
-		System.out.println("Résultat appel normal: " + result);
+		System.out.println("Résultat appel normal: ");
 	}
 
 	private void appelRMILocal() {
 		try {
 			long start = System.nanoTime();
-			int result = localServerStub.execute(4, 7);
+			localServerStub.empty(param, param);
 			long end = System.nanoTime();
 
 			System.out.println("Temps écoulé appel RMI local: " + (end - start)
 					+ " ns");
-			System.out.println("Résultat appel RMI local: " + result);
+			System.out.println("Résultat appel RMI local: ");
 		} catch (RemoteException e) {
 			System.out.println("Erreur: " + e.getMessage());
 		}
@@ -97,12 +102,12 @@ public class Client {
 	private void appelRMIDistant() {
 		try {
 			long start = System.nanoTime();
-			int result = distantServerStub.execute(4, 7);
+			distantServerStub.empty(param, param);
 			long end = System.nanoTime();
 
 			System.out.println("Temps écoulé appel RMI distant: "
 					+ (end - start) + " ns");
-			System.out.println("Résultat appel RMI distant: " + result);
+			System.out.println("Résultat appel RMI distant: ");
 		} catch (RemoteException e) {
 			System.out.println("Erreur: " + e.getMessage());
 		}

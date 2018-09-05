@@ -42,8 +42,16 @@ public class Server implements ServerInterface {
 	}
 
 	/*
-	 * Méthode accessible par RMI. Additionne les deux nombres passés en
-	 * paramètre.
+	 * Méthodes accessibles par RMI. 
+	 */
+	 
+	@Override
+	public void empty(byte[] a, byte[] b) throws RemoteException {
+		return;
+	}
+	
+	/*
+	 *Additionne les deux nombres passés en paramètre. 
 	 */
 	@Override
 	public int execute(int a, int b) throws RemoteException {

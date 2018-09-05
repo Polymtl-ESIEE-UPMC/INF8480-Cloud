@@ -4,4 +4,8 @@ public class FakeServer {
 	int execute(int a, int b) {
 		return a + b;
 	}
+	
+	public void empty(byte[] a, byte[] b) {
+		return;
+	}
 }
