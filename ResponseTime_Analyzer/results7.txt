@@ -1,0 +1,10 @@
+HELP: 
+./client.sh ip_address
+	- remote_server_ip: (OPTIONAL) l'addresse ip du serveur distant
+
+Temps écoulé appel normal: 2240 ns
+Résultat appel normal: 
+Temps écoulé appel RMI local: 10932782 ns
+Résultat appel RMI local: 
+Temps écoulé appel RMI distant: 867158455 ns
+Résultat appel RMI distant: 
