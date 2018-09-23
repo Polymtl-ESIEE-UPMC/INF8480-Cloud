@@ -29,7 +29,7 @@ public class FileServer implements FileServerInterface {
 					.exportObject(this, 0);
 
 			Registry registry = LocateRegistry.getRegistry();
-			registry.rebind("server", stub);
+			registry.rebind("fileServer", stub);
 			System.out.println("Server ready.");
 		} catch (ConnectException e) {
 			System.err

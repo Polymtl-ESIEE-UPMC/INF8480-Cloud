@@ -10,20 +10,18 @@ import shared.AuthServerInterface;
 import shared.FileServerInterface;
 
 public class Client {
-	static int size;
-	static byte[] param;
+
 	public static void main(String[] args) {
 		String distantHostname = null;
 
-		if (args.length > 0) {
-			distantHostname = args[0];
-			size = Integer.parseInt(args[1]);
-			param = new byte[(int)(Math.pow(10, size))];
-		}
+		// gérer les args
 
 		Client client = new Client(distantHostname);
 		client.run();
 	}
+
+	private AuthServerInterface authServer = null;
+	private FileServerInterface fileServer = null;
 
 	public Client(String distantServerHostname) {
 		super();
@@ -31,9 +29,53 @@ public class Client {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
+		authServer = loadAuthServer("127.0.0.1");
+		//fileServer = loadFileServer("127.0.0.1");
+	}
+
+	private AuthServerInterface loadAuthServer(String hostname) {
+		AuthServerInterface stub = null;
+
+		try {
+			Registry registry = LocateRegistry.getRegistry(hostname);
+			stub = (AuthServerInterface) registry.lookup("authServer");
+		} catch (NotBoundException e) {
+			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
+		} catch (AccessException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		} catch (RemoteException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		}
+
+		return stub;
+	}
+
+	private FileServerInterface loadFileServer(String hostname) {
+		FileServerInterface stub = null;
+
+		try {
+			Registry registry = LocateRegistry.getRegistry(hostname);
+			stub = (FileServerInterface) registry.lookup("fileServer");
+		} catch (NotBoundException e) {
+			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
+		} catch (AccessException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		} catch (RemoteException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		}
+
+		return stub;
 	}
 
 	private void run() {
-
+		if (authServer != null) {
+			try {
+				boolean response;
+				response = authServer.newAccount("test", "admin");
+				System.out.print(response);
+			} catch (RemoteException e) {
+				System.out.println("Erreur: " + e.getMessage());
+			}
+		}
 	}
 }
