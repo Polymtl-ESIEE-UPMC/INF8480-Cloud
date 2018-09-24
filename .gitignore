@@ -2,3 +2,4 @@
 *.class
 FileSystem/accounts/*
 FileSystem/credentials
+FileSystem/files/*
