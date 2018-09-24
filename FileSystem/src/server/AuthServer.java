@@ -59,7 +59,7 @@ public class AuthServer implements AuthServerInterface {
 	 
 	@Override
 	public boolean newAccount(String login, String password) throws RemoteException {
-		String filePath = ACCOUNTS_DIR_NAME + "\\" + login;
+		String filePath = ACCOUNTS_DIR_NAME + "/" + login;
 		File file = new File(filePath);
 		if(file.exists()) { 
 			// le compte existe déjà
@@ -78,7 +78,7 @@ public class AuthServer implements AuthServerInterface {
 
 	@Override
 	public boolean verifyAccount(Account account) throws RemoteException {
-		String filePath = ACCOUNTS_DIR_NAME + "\\" + account.userName;
+		String filePath = ACCOUNTS_DIR_NAME + "/" + account.userName;
 		String userName = "", validPass = "";
 
 		try {
