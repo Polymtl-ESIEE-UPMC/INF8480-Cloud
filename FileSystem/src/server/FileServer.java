@@ -17,6 +17,7 @@ import shared.Account;
 import shared.AuthServerInterface;
 import shared.Fichier;
 import shared.FileServerInterface;
+import shared.MD5CheckSum;
 
 public class FileServer implements FileServerInterface {
 	private static final String FILES_DIR_NAME = "files";
@@ -104,7 +105,7 @@ public class FileServer implements FileServerInterface {
 		List<Fichier> filesList = new ArrayList<>();
 		final File filesFolder = new File(FILES_DIR_NAME);
 		for (final File file : filesFolder.listFiles()) {
-			//TODO: change with actual values
+			// TODO: change with actual values
 			Fichier fichier = new Fichier(file.getName(), true, "test");
 			filesList.add(fichier);
 		}
@@ -112,10 +113,26 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public byte[] getFile(Account account, String name, String checksum) throws RemoteException {
+	public Fichier getFile(Account account, String fileName, String checksum) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		return new byte[5];
+		Fichier fichier = null;
+		String filePath = FILES_DIR_NAME + "/" + fileName;
+		File file = new File(filePath);
+		if (file.exists()) {
+			if (checksum == null || !MD5CheckSum.generateChecksum(filePath).equals(checksum)) {
+				// envoyer le fichier
+				try {
+					byte[] fileContent = Files.readAllBytes(file.toPath());
+					fichier = new Fichier(file.getName(), fileContent);
+				} catch (IOException e) {
+					System.err.println("Could not read " + file.getName() + " contents.");
+				}
+			}
+		} else {
+			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+		}
+		return fichier;
 	}
 
 	@Override
