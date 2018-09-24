@@ -16,8 +16,6 @@ public class GetCommand extends Command{
         try{
             String md5 = MD5CheckSum.generateChecksum(fileName);
             fileServer.getFile(account, fileName, md5);
-        } catch (IOException e){
-            System.err.println(fileName + " n'existe pas sur votre disque!");
         } catch (NoSuchAlgorithmException e){
             System.err.println(e.getMessage());
         }
