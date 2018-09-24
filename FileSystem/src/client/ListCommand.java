@@ -15,5 +15,6 @@ public class ListCommand extends Command{
         for(Fichier file : files){
             System.out.println(file);
         }
+        System.out.println(files.size() + " fichier(s)");
     }
 }
