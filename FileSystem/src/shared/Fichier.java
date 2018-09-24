@@ -16,4 +16,15 @@ public class Fichier implements Serializable{
         this.lockUser = "";
     }
 
+    public Fichier(String name, boolean locked, String lockUser){
+        this.name = name;
+        this.content = new byte[0];
+        this.locked = locked;
+        this.lockUser = lockUser;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("* %-20s%s", name, (locked) ? "vérouillé par : " + lockUser : "non vérouillé");
+    }
 }

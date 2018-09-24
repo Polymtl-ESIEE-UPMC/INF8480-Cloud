@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface FileServerInterface extends Remote {
 	boolean createFile(Account account, String fileName) throws RemoteException;
-	String[] listFiles(Account account) throws RemoteException;
+	List<Fichier> listFiles(Account account) throws RemoteException;
 	//https://stackoverflow.com/questions/304268/getting-a-files-md5-checksum-in-java
 	byte[] getFile(Account account, String name, String checksum) throws RemoteException;
 	String lockFile(Account account, String name, String checksum) throws RemoteException;

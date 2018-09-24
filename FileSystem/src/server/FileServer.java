@@ -98,10 +98,17 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public String[] listFiles(Account account) throws RemoteException {
+	public List<Fichier> listFiles(Account account) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		return "1 2 3 4 5".split(" ");
+		List<Fichier> filesList = new ArrayList<>();
+		final File filesFolder = new File(FILES_DIR_NAME);
+		for (final File file : filesFolder.listFiles()) {
+			//TODO: change with actual values
+			Fichier fichier = new Fichier(file.getName(), true, "test");
+			filesList.add(fichier);
+		}
+		return filesList;
 	}
 
 	@Override
@@ -132,11 +139,11 @@ public class FileServer implements FileServerInterface {
 		List<Fichier> filesList = new ArrayList<>();
 		final File filesFolder = new File(FILES_DIR_NAME);
 		for (final File file : filesFolder.listFiles()) {
-			try{
+			try {
 				byte[] fileContent = Files.readAllBytes(file.toPath());
 				Fichier fichier = new Fichier(file.getName(), fileContent);
 				filesList.add(fichier);
-			} catch (IOException e){
+			} catch (IOException e) {
 				System.err.println("Could not read " + file.getName() + " contents.");
 			}
 		}
