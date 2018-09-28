@@ -148,7 +148,6 @@ public class FileServer implements FileServerInterface {
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
-		return false;
 	}
 
 	@Override
@@ -162,7 +161,6 @@ public class FileServer implements FileServerInterface {
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
-		return false;
 	}
 
 	@Override
@@ -203,7 +201,6 @@ public class FileServer implements FileServerInterface {
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
-		return false;
 	}
 
 	@Override
