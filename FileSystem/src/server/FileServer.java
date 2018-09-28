@@ -12,6 +12,8 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 
 import shared.Account;
 import shared.AuthServerInterface;
@@ -139,33 +141,35 @@ public class FileServer implements FileServerInterface {
 	public boolean lockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + fileName;
+		String filePath = FILES_DIR_NAME + "/" + name;
 		File file = new File(filePath);
 		if (file.exists()) {
-			return (new Fichier(file.getName())).lock_fichier();
+			return (new Fichier(file.getName())).lock_fichier(account);
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
+		return false;
 	}
 
 	@Override
 	public boolean unlockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + fileName;
+		String filePath = FILES_DIR_NAME + "/" + name;
 		File file = new File(filePath);
 		if (file.exists()) {
-			return (new Fichier(file.getName())).unlock_fichier();
+			return (new Fichier(file.getName())).unlock_fichier(account);
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
+		return false;
 	}
 
 	@Override
 	public boolean pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + fileName;
+		String filePath = FILES_DIR_NAME + "/" + name;
 		File file = new File(filePath);
 		if (file.exists()) {
 			Fichier fichier = new Fichier(file.getName());
@@ -199,6 +203,7 @@ public class FileServer implements FileServerInterface {
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
+		return false;
 	}
 
 	@Override

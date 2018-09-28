@@ -1,6 +1,7 @@
 package shared;
 
 import java.io.Serializable;
+import java.io.*;
 
 public class Fichier implements Serializable{
     private static final String FILES_DIR_NAME = "files";
@@ -16,6 +17,12 @@ public class Fichier implements Serializable{
         this.lock = FILES_DIR_NAME+"/."+name+"_lockstate";
     }
 
+    public Fichier(String name, boolean legacy, String legacy1){
+        this.name = name;
+        this.content = new byte[0];
+        this.lock = FILES_DIR_NAME+"/."+name+"_lockstate";
+    }
+
     public Fichier(String name){
         this.name = name;
         this.content = new byte[0];
@@ -27,9 +34,8 @@ public class Fichier implements Serializable{
         return String.format("* %-20s%s", name, lockState() ? "vérouillé par : " + lockByUser : "non vérouillé");
     }
 
-    @Override
     public boolean lockState(){
-        try {.
+        try {
             FileReader fileReader = new FileReader(lock);
             BufferedReader bufferedReader = new BufferedReader(fileReader);
             String[] state = new String[2];
@@ -46,9 +52,9 @@ public class Fichier implements Serializable{
         catch(IOException e) {
             e.printStackTrace();
         }
+        return false;
     }
 
-    @Override
     private boolean changeLockState(String state, String username){
         try {
             FileWriter fileWriter = new FileWriter(lock);
@@ -62,9 +68,9 @@ public class Fichier implements Serializable{
         catch(IOException e) {
             e.printStackTrace();
         }
+        return false;
     }
 
-    @Override
     public boolean lock_fichier(Account account){
         if(!lockState()){
             lockByUser = account.userName;
