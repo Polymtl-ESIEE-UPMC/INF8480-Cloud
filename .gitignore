@@ -3,3 +3,4 @@
 FileSystem/accounts/*
 FileSystem/credentials
 FileSystem/files/*
+.vscode/*
