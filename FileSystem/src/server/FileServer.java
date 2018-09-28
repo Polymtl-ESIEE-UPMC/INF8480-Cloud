@@ -136,17 +136,69 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public String lockFile(Account account, String name, String checksum) throws RemoteException {
+	public boolean lockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		return "";
+		String filePath = FILES_DIR_NAME + "/" + fileName;
+		File file = new File(filePath);
+		if (file.exists()) {
+			return (new Fichier(file.getName())).lock_fichier();
+		} else {
+			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+		}
 	}
 
 	@Override
-	public String pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
+	public boolean unlockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		return "";
+		String filePath = FILES_DIR_NAME + "/" + fileName;
+		File file = new File(filePath);
+		if (file.exists()) {
+			return (new Fichier(file.getName())).unlock_fichier();
+		} else {
+			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+		}
+	}
+
+	@Override
+	public boolean pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
+		if (!authServer.verifyAccount(account))
+			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
+		String filePath = FILES_DIR_NAME + "/" + fileName;
+		File file = new File(filePath);
+		if (file.exists()) {
+			Fichier fichier = new Fichier(file.getName());
+			if (fichier.lockState()){
+				if (fichier.lockByUser.equals(account.userName)){
+					try {
+						FileOutputStream stream = new FileOutputStream(filePath);
+						try {
+							stream.write(fileContent);
+							System.out.println("Le fichier serveur a été mis à jour avec la version locale.");
+						} catch (IOException e) {
+							System.err.println(e.getMessage());
+						} finally {
+							try {
+								if (stream != null)
+									stream.close();
+							} catch (IOException e) {
+								System.err.println("Un problème inconnu est survenu : " + e.getMessage());
+							}
+						}
+					} catch (FileNotFoundException e) {
+						System.err.println(e.getMessage());
+					}
+					return true;
+				}else{
+					throw new RemoteException("Locked by someone else!");	
+				}
+			}else{
+				throw new RemoteException("Please lock file first!");	
+			}
+		} else {
+			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+		}
 	}
 
 	@Override
