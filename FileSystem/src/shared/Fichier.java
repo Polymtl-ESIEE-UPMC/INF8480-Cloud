@@ -93,7 +93,7 @@ public class Fichier implements Serializable {
             return changeLockState(String.valueOf(true), lockByUser);
         }
         int code = 102;
-        return new Response(code, "ERROR "+code+": Le fichier est deja verouille");
+        return new Response(code, "ERROR "+code+": Le fichier est deja verouille par "+lockByUser);
     }
 
     public Response unlock_fichier(Account account) {
