@@ -9,7 +9,7 @@ public interface FileServerInterface extends Remote {
 	List<Fichier> listFiles(Account account) throws RemoteException;
 	//https://stackoverflow.com/questions/304268/getting-a-files-md5-checksum-in-java
 	Fichier getFile(Account account, String fileName, String checksum) throws RemoteException;
-	Response lockFile(Account account, String fileName) throws RemoteException;
+	Response lockFile(Account account, String fileName, String checksum) throws RemoteException;
 	Response unlockFile(Account account, String fileName) throws RemoteException;
 	Response pushFile(Account account, String fileName, byte[] fileContent) throws RemoteException;
 	List<Fichier> syncLocalDirectory(Account account) throws RemoteException;

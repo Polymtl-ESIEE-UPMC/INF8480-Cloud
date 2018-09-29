@@ -146,13 +146,15 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public Response lockFile(Account account, String name) throws RemoteException {
+	public Response lockFile(Account account, String name, String checksum) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
 		String filePath = FILES_DIR_NAME + "/" + name;
 		File file = new File(filePath);
 		if (file.exists()) {
-			return (new Fichier(file.getName())).lock_fichier(account);
+			Response res = new Fichier(file.getName()).lock_fichier(account);
+			res.object = getFile(account, name, checksum);
+			return res;
 		} else {
 			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
 		}
@@ -210,7 +212,7 @@ public class FileServer implements FileServerInterface {
 		} else {
 			System.out.println("Le fichier n'existe pas sur le serveur, auto creer un fichier");
 			if(createFile(account, name)){
-				System.out.println(lockFile(account, name).msg);
+				System.out.println(lockFile(account, name, "").msg);
 				return pushFile(account, name, fileContent);
 			}else{
 				throw new RemoteException("auto creer fichier echoue, push non realise");
