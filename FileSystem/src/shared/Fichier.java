@@ -62,13 +62,13 @@ public class Fichier implements Serializable {
         return false;
     }
 
-    public void createLock() throws IOException{
+    public void createLock() throws IOException {
         File file = new File(lock);
-		if (file.exists()) {
-			throw new IOException("Lock existe deja sur le serveur!");
-		} else {
-			changeLockState(String.valueOf(false), "");
-		}
+        if (file.exists()) {
+            throw new IOException("Lock existe deja sur le serveur!");
+        } else {
+            changeLockState(String.valueOf(false), "");
+        }
     }
 
     private Response changeLockState(String state, String username) {
@@ -79,12 +79,12 @@ public class Fichier implements Serializable {
             bufferedWriter.newLine();
             bufferedWriter.write(username);
             bufferedWriter.close();
-            return new Response(1, "SUCCES: Changer l'etat de lock en "+state+" avec succes");
+            return new Response(1, "SUCCES: Changer l'etat de lock en " + state + " avec succes");
         } catch (IOException e) {
             e.printStackTrace();
         }
         int code = 101;
-        return new Response(code, "ERROR "+code+": Echouer de changer l'etat de lock en "+state);
+        return new Response(code, "ERROR " + code + ": Echouer de changer l'etat de lock en " + state);
     }
 
     public Response lock_fichier(Account account) {
@@ -101,13 +101,13 @@ public class Fichier implements Serializable {
             if (lockByUser.equals(account.userName)) {
                 lockByUser = "";
                 return changeLockState(String.valueOf(false), lockByUser);
-            }else{
+            } else {
                 int code = 104;
-                return new Response(code, "PERMISSION DENIED "+code+": Le fichier est verouille par "+lockByUser);
+                return new Response(code, "PERMISSION DENIED " + code + ": Le fichier est verouille par " + lockByUser);
             }
-        }else{
+        } else {
             int code = 103;
-            return new Response(code, "ERROR "+code+": Le fichier est non verouille");
+            return new Response(code, "ERROR " + code + ": Le fichier est non verouille");
         }
     }
 }
