@@ -20,6 +20,7 @@ import shared.AuthServerInterface;
 import shared.Fichier;
 import shared.FileServerInterface;
 import shared.MD5CheckSum;
+import shared.Response;
 
 public class FileServer implements FileServerInterface {
 	private static final String FILES_DIR_NAME = "files";
@@ -94,7 +95,14 @@ public class FileServer implements FileServerInterface {
 			return false;
 		}
 		try {
-			return newFile.createNewFile();
+			boolean created =  newFile.createNewFile();
+			if(created){
+				Fichier fichier = new Fichier(fileName);
+				fichier.createLock();
+				return true;
+			}else{
+				return false;
+			}
 		} catch (IOException e) {
 			return false;
 		}
@@ -138,7 +146,7 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public boolean lockFile(Account account, String name) throws RemoteException {
+	public Response lockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
 		String filePath = FILES_DIR_NAME + "/" + name;
@@ -151,7 +159,7 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public boolean unlockFile(Account account, String name) throws RemoteException {
+	public Response unlockFile(Account account, String name) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
 		String filePath = FILES_DIR_NAME + "/" + name;
@@ -164,7 +172,7 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public boolean pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
+	public Response pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
 		String filePath = FILES_DIR_NAME + "/" + name;
@@ -191,7 +199,8 @@ public class FileServer implements FileServerInterface {
 					} catch (FileNotFoundException e) {
 						System.err.println(e.getMessage());
 					}
-					return true;
+					System.out.println(unlockFile(account, name).msg);
+					return new Response(1, "SUCCES: Le fichier est push sur le serveur");
 				}else{
 					throw new RemoteException("Locked by someone else!");	
 				}
@@ -199,7 +208,13 @@ public class FileServer implements FileServerInterface {
 				throw new RemoteException("Please lock file first!");	
 			}
 		} else {
-			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+			System.out.println("Le fichier n'existe pas sur le serveur, auto creer un fichier");
+			if(createFile(account, name)){
+				System.out.println(lockFile(account, name).msg);
+				return pushFile(account, name, fileContent);
+			}else{
+				throw new RemoteException("auto creer fichier echoue, push non realise");
+			}			
 		}
 	}
 

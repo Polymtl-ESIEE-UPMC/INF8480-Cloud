@@ -22,6 +22,7 @@
 		<javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false">
 			<src path="src" />
 			<classpath refid="TP1.classpath" />
+			<compilerarg line="--add-modules java.xml.bind"/>
 		</javac>
 	</target>
 	<target depends="build-class" name="build-jar">

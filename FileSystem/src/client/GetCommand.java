@@ -20,7 +20,6 @@ public class GetCommand extends Command {
             System.out.println("Le fichier local est déjà à jour avec la version du serveur.");
         } else {
             try {
-
                 FileOutputStream stream = new FileOutputStream(fichier.name);
                 try {
                     stream.write(fichier.content);

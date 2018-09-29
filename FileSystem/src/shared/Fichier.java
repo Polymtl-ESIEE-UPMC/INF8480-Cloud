@@ -1,5 +1,6 @@
 package shared;
 
+import java.io.File;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
@@ -9,6 +10,9 @@ import java.io.IOException;
 import java.io.Serializable;
 
 public class Fichier implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     private static final String FILES_DIR_NAME = "files";
 
     public String name;
@@ -58,7 +62,16 @@ public class Fichier implements Serializable {
         return false;
     }
 
-    private boolean changeLockState(String state, String username) {
+    public void createLock() throws IOException{
+        File file = new File(lock);
+		if (file.exists()) {
+			throw new IOException("Lock existe deja sur le serveur!");
+		} else {
+			changeLockState(String.valueOf(false), "");
+		}
+    }
+
+    private Response changeLockState(String state, String username) {
         try {
             FileWriter fileWriter = new FileWriter(lock);
             BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
@@ -66,26 +79,35 @@ public class Fichier implements Serializable {
             bufferedWriter.newLine();
             bufferedWriter.write(username);
             bufferedWriter.close();
-            return true;
+            return new Response(1, "SUCCES: Changer l'etat de lock en "+state+" avec succes");
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return false;
+        int code = 101;
+        return new Response(code, "ERROR "+code+": Echouer de changer l'etat de lock en "+state);
     }
 
-    public boolean lock_fichier(Account account) {
+    public Response lock_fichier(Account account) {
         if (!lockState()) {
             lockByUser = account.userName;
             return changeLockState(String.valueOf(true), lockByUser);
         }
-        return false;
+        int code = 102;
+        return new Response(code, "ERROR "+code+": Le fichier est deja verouille");
     }
 
-    public boolean unlock_fichier(Account account) {
-        if (lockByUser.equals(account.userName)) {
-            lockByUser = "";
-            return changeLockState(String.valueOf(false), lockByUser);
+    public Response unlock_fichier(Account account) {
+        if (lockState()) {
+            if (lockByUser.equals(account.userName)) {
+                lockByUser = "";
+                return changeLockState(String.valueOf(false), lockByUser);
+            }else{
+                int code = 104;
+                return new Response(code, "PERMISSION DENIED "+code+": Le fichier est verouille par "+lockByUser);
+            }
+        }else{
+            int code = 103;
+            return new Response(code, "ERROR "+code+": Le fichier est non verouille");
         }
-        return false;
     }
 }
