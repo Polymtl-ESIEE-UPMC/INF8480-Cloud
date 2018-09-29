@@ -204,7 +204,7 @@ public class FileServer implements FileServerInterface {
 					System.out.println(unlockFile(account, name).msg);
 					return new Response(1, "SUCCES: Le fichier est push sur le serveur");
 				} else {
-					throw new RemoteException("Locked by someone else!");
+					throw new RemoteException("Le fichier est verouille par: "+fichier.lockByUser);
 				}
 			} else {
 				throw new RemoteException("Please lock file first!");
