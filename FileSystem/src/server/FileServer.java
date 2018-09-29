@@ -95,12 +95,12 @@ public class FileServer implements FileServerInterface {
 			return false;
 		}
 		try {
-			boolean created =  newFile.createNewFile();
-			if(created){
+			boolean created = newFile.createNewFile();
+			if (created) {
 				Fichier fichier = new Fichier(fileName);
 				fichier.createLock();
 				return true;
-			}else{
+			} else {
 				return false;
 			}
 		} catch (IOException e) {
@@ -181,8 +181,8 @@ public class FileServer implements FileServerInterface {
 		File file = new File(filePath);
 		if (file.exists()) {
 			Fichier fichier = new Fichier(file.getName());
-			if (fichier.lockState()){
-				if (fichier.lockByUser.equals(account.userName)){
+			if (fichier.lockState()) {
+				if (fichier.lockByUser.equals(account.userName)) {
 					try {
 						FileOutputStream stream = new FileOutputStream(filePath);
 						try {
@@ -203,20 +203,20 @@ public class FileServer implements FileServerInterface {
 					}
 					System.out.println(unlockFile(account, name).msg);
 					return new Response(1, "SUCCES: Le fichier est push sur le serveur");
-				}else{
-					throw new RemoteException("Locked by someone else!");	
+				} else {
+					throw new RemoteException("Locked by someone else!");
 				}
-			}else{
-				throw new RemoteException("Please lock file first!");	
+			} else {
+				throw new RemoteException("Please lock file first!");
 			}
 		} else {
 			System.out.println("Le fichier n'existe pas sur le serveur, auto creer un fichier");
-			if(createFile(account, name)){
+			if (createFile(account, name)) {
 				System.out.println(lockFile(account, name, "").msg);
 				return pushFile(account, name, fileContent);
-			}else{
+			} else {
 				throw new RemoteException("auto creer fichier echoue, push non realise");
-			}			
+			}
 		}
 	}
 
