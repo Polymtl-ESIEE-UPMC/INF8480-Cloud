@@ -21,55 +21,65 @@ public class Client {
 	public static void main(String[] args) {
 		String distantHostname = null;
 
-		if (args.length < 1 || args.length > 2) {
+		if (args.length < 1) {
 			printHelp();
 			return;
 		}
 
 		Command command = null;
 		String fileName = "";
-		// TODO: ajouter option de serveur distant
-		try {
-			switch (args[0]) {
-			case "list":
-				command = new ListCommand();
-				break;
-			case "create":
-				command = new CreateCommand();
-				fileName = args[1];
-				break;
-			case "get":
-				command = new GetCommand();
-				fileName = args[1];
-				break;
-			case "push":
-				command = new PushCommand();
-				fileName = args[1];
-				break;
-			case "lock":
-				command = new LockCommand();
-				fileName = args[1];
-				break;
-			case "syncLocalDirectory":
-				command = new SyncCommand();
-				break;
-			default:
-				System.err.println("Mauvaise commande : " + args[0]);
-				printHelp();
+		
+		for (int i = 0; i < args.length && command == null; i++) {
+			try {
+				switch (args[i]) {
+				case "-i":
+					distantHostname = args[++i];
+					break;
+				case "list":
+					command = new ListCommand();
+					break;
+				case "create":
+					command = new CreateCommand();
+					fileName = args[++i];
+					break;
+				case "get":
+					command = new GetCommand();
+					fileName = args[++i];
+					break;
+				case "push":
+					command = new PushCommand();
+					fileName = args[++i];
+					break;
+				case "lock":
+					command = new LockCommand();
+					fileName = args[++i];
+					break;
+				case "syncLocalDirectory":
+					command = new SyncCommand();
+					break;
+				default:
+					System.err.println("Mauvaise commande : " + args[i]);
+					printHelp();
+					return;
+				}
+			} catch (IndexOutOfBoundsException e) {
+				System.err.println("Veuillez entrer un nom de fichier");
 				return;
 			}
-		} catch (IndexOutOfBoundsException e) {
-			System.err.println("Veuillez entrer un nom de fichier");
-			return;
 		}
 
 		Client client = new Client(distantHostname);
-		client.run(command, fileName);
+		if(command != null){
+			client.run(command, fileName);
+		} else {
+			System.err.println("Veuillez entrer une commande!");
+			printHelp();
+		}
 	}
 
 	public static void printHelp() {
-		System.out.println("Liste des commandes :\n" + "list\n" + "create nomDeFichier\n" + "get nomDeFichier\n"
-				+ "push nomDeFichier\n" + "lock nomDeFichier\n" + "syncLocalDirectory");
+		System.out.println("Liste des commandes :\n" + "-i ip_adress\n" + "list\n" + "create nomDeFichier\n" + "get nomDeFichier\n"
+				+ "push nomDeFichier\n" + "lock nomDeFichier\n" + "syncLocalDirectory\n");
 	}
 
 	private AuthServerInterface authServer = null;
@@ -78,12 +88,17 @@ public class Client {
 
 	public Client(String distantServerHostname) {
 		super();
-
+		
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
-		authServer = loadAuthServer("127.0.0.1");
-		fileServer = loadFileServer("127.0.0.1");
+		if(distantServerHostname != null){
+			authServer = loadAuthServer(distantServerHostname);
+			fileServer = loadFileServer(distantServerHostname);
+		}else{
+			authServer = loadAuthServer("127.0.0.1");
+			fileServer = loadFileServer("127.0.0.1");
+		}
 	}
 
 	private AuthServerInterface loadAuthServer(String hostname) {
@@ -192,9 +207,9 @@ public class Client {
 						ps.println(userName);
 						ps.println(pass);
 						System.out.println("Création du compte réussie!");
-					} catch (FileNotFoundException e){
+					} catch (FileNotFoundException e) {
 						System.err.println("Problème lors de la création du fichier d'informations de compte.");
-						return ;
+						return;
 					}
 				} else {
 					System.out.println("Ce nom d'utilisateur n'est pas disponible, veuillez recommencer.");
