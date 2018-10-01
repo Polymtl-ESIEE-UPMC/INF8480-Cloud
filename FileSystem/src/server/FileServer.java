@@ -24,10 +24,13 @@ import shared.Response;
 
 public class FileServer implements FileServerInterface {
 	private static final String FILES_DIR_NAME = "files";
+	private static final String LOCKS_DIR_NAME = "locks";
 
 	public static void main(String[] args) {
 		File filesDir = new File(FILES_DIR_NAME);
 		filesDir.mkdir();
+		File locksDir = new File(LOCKS_DIR_NAME);
+		locksDir.mkdir();
 		FileServer server = new FileServer();
 		server.run();
 	}
