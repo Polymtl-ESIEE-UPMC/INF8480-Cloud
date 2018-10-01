@@ -13,7 +13,7 @@ public class Fichier implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private static final String FILES_DIR_NAME = "files";
+    private static final String FILES_DIR_NAME = ".lock";
 
     public String name;
     public byte[] content;
