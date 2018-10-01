@@ -4,3 +4,4 @@ FileSystem/accounts/*
 FileSystem/credentials
 FileSystem/files/*
 .vscode/*
+FileSystem/locks/*
