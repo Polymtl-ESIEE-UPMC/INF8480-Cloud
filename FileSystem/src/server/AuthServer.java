@@ -18,10 +18,12 @@ import shared.Account;
 import shared.AuthServerInterface;
 
 public class AuthServer implements AuthServerInterface {
+	//dossier où les comptes sont sauvegardés
 	private static final String ACCOUNTS_DIR_NAME = "accounts";
 
 	public static void main(String[] args) {
 		File accountsDir = new File(ACCOUNTS_DIR_NAME);
+		//crée le dossier s'il n'existe pas
 		accountsDir.mkdir();
 		AuthServer server = new AuthServer();
 		server.run();
@@ -57,6 +59,10 @@ public class AuthServer implements AuthServerInterface {
 	 * Méthodes accessibles par RMI. 
 	 */
 	 
+	/**
+	 * Crée un nouveau compte à partir d'un nom d'utilisateur et un mot de passe
+	 * retourne true si la création a réussie, sinon false
+	 */
 	@Override
 	public boolean newAccount(String login, String password) throws RemoteException {
 		String filePath = ACCOUNTS_DIR_NAME + "/" + login;
@@ -67,6 +73,7 @@ public class AuthServer implements AuthServerInterface {
 		}
 
 		try (PrintStream ps = new PrintStream(filePath)) {
+			//écrit les informations de compte dans le fichier
 			ps.println(login);
 			ps.println(password);
 		} catch (FileNotFoundException e){
@@ -76,12 +83,16 @@ public class AuthServer implements AuthServerInterface {
 		return true;
 	}
 
+	/**
+	 * Vérifie si le compte reçu existe et que le mot de passe est valide
+	 */
 	@Override
 	public boolean verifyAccount(Account account) throws RemoteException {
 		String filePath = ACCOUNTS_DIR_NAME + "/" + account.userName;
 		String userName = "", validPass = "";
 
 		try {
+			//lis le contenu du fichier
 			BufferedReader fileReader = new BufferedReader(new FileReader(filePath));
 			try {
 				userName = fileReader.readLine();
@@ -100,6 +111,7 @@ public class AuthServer implements AuthServerInterface {
 			return false;
 		}
 		
+		//retourne si le compte est valide
 		return account.userName.equals(userName) && account.password.equals(validPass);
 	}
 }
