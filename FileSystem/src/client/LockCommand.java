@@ -3,7 +3,6 @@ package client;
 import shared.Account;
 import shared.AuthServerInterface;
 import shared.FileServerInterface;
-import shared.Response;
 import shared.Fichier;
 import shared.MD5CheckSum;
 import java.rmi.RemoteException;
@@ -16,9 +15,8 @@ public class LockCommand extends Command{
 
     public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException{
         String md5 = MD5CheckSum.generateChecksum(fileName);
-        Response res = fileServer.lockFile(account, fileName, md5);
-        System.out.println(res.msg);
-        Fichier fichier = (Fichier) res.object;
+        Fichier fichier = fileServer.lockFile(account, fileName, md5);
+        System.out.println("Mise à jour du fichier local...");
         if (fichier == null) {
             System.out.println("Le fichier local est déjà à jour avec la version du serveur.");
         } else {
@@ -41,5 +39,6 @@ public class LockCommand extends Command{
                 System.err.println(e.getMessage());
             }
         }
+        System.out.println("Le fichier a bien été verrouillé sur le serveur.");
     }
 }

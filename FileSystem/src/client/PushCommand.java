@@ -1,7 +1,6 @@
 package client;
 
 import shared.Account;
-import shared.Response;
 import java.rmi.RemoteException;
 import shared.AuthServerInterface;
 import shared.FileServerInterface;
@@ -20,13 +19,17 @@ public class PushCommand extends Command {
             byte[] fileContent = null;
             try {
                 fileContent = Files.readAllBytes(file.toPath());
-            }catch (IOException e) {
+            } catch (IOException e) {
                 System.err.println("Could not read " + file.getName() + " contents.");
+                return;
             }
-            Response res = fileServer.pushFile(account, fileName, fileContent);
-                System.out.println(res.msg);
+            if (fileServer.pushFile(account, fileName, fileContent)) {
+                System.out.println(fileName + " a correctement été envoyé au serveur.");
+            } else {
+                System.out.println("Une erreur s'est produite sur le serveur.");
+            }
         } else {
-            throw new RemoteException("Ce fichier n'existe pas en local");
+            System.err.println("Ce fichier n'existe pas en local.");
         }
     }
 }

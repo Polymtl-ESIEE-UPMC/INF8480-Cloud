@@ -1,5 +1,7 @@
 package server;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,13 +16,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 
 import shared.Account;
 import shared.AuthServerInterface;
 import shared.Fichier;
 import shared.FileServerInterface;
 import shared.MD5CheckSum;
-import shared.Response;
 
 public class FileServer implements FileServerInterface {
 	private static final String FILES_DIR_NAME = "files";
@@ -83,6 +86,75 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
+	// mettre filepath
+	private static List<String> readAllText(String filePath) {
+		List<String> text = new ArrayList<>();
+
+		try {
+			BufferedReader fileReader = new BufferedReader(new FileReader(filePath));
+			try {
+				String line;
+				while ((line = fileReader.readLine()) != null) {
+					text.add(line);
+				}
+			} catch (IOException e) {
+				System.err.println("Un problème inconnu est survenu : " + e.getMessage());
+			} finally {
+				try {
+					if (fileReader != null)
+						fileReader.close();
+				} catch (IOException e) {
+					System.err.println("Un problème inconnu est survenu : " + e.getMessage());
+				}
+			}
+		} catch (FileNotFoundException e) {
+			System.err.println(e.getMessage());
+		}
+
+		return text;
+	}
+
+	private boolean modifyLock(String fileName, String username, boolean locked) {
+		try {
+			String lockPath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
+			FileWriter fileWriter = new FileWriter(lockPath);
+			BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+			bufferedWriter.write(locked + "");
+			bufferedWriter.newLine();
+			if (locked) {
+				bufferedWriter.write(username);
+				bufferedWriter.newLine();
+			}
+			bufferedWriter.close();
+			return true;
+		} catch (IOException e) {
+			System.out.println("Erreur lors de la manipulation du fichier lock de " + fileName);
+			e.printStackTrace();
+		}
+
+		return false;
+	}
+
+	private static boolean isLocked(String fileName) {
+		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
+		File file = new File(filePath);
+		if (file.exists()) {
+			return readAllText(filePath).get(0).equals("true");
+		} else {
+			return false;
+		}
+	}
+
+	private static String fileOwner(String fileName) {
+		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
+		File file = new File(filePath);
+		if (file.exists()) {
+			return readAllText(filePath).get(1);
+		} else {
+			return null;
+		}
+	}
+
 	/*
 	 * Méthodes accessibles par RMI.
 	 */
@@ -100,8 +172,7 @@ public class FileServer implements FileServerInterface {
 		try {
 			boolean created = newFile.createNewFile();
 			if (created) {
-				Fichier fichier = new Fichier(fileName);
-				fichier.createLock();
+				modifyLock(fileName, account.userName, false);
 				return true;
 			} else {
 				return false;
@@ -119,7 +190,12 @@ public class FileServer implements FileServerInterface {
 		final File filesFolder = new File(FILES_DIR_NAME);
 		for (final File file : filesFolder.listFiles()) {
 			// TODO: change with actual values
-			Fichier fichier = new Fichier(file.getName(), true, "test");
+			boolean locked = isLocked(file.getName());
+			String lockUser = "";
+			if (locked) {
+				lockUser = fileOwner(file.getName());
+			}
+			Fichier fichier = new Fichier(file.getName(), locked, lockUser);
 			filesList.add(fichier);
 		}
 		return filesList;
@@ -149,50 +225,42 @@ public class FileServer implements FileServerInterface {
 	}
 
 	@Override
-	public Response lockFile(Account account, String name, String checksum) throws RemoteException {
+	public Fichier lockFile(Account account, String fileName, String checksum) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + name;
-		File file = new File(filePath);
-		if (file.exists()) {
-			Response res = new Fichier(file.getName()).lock_fichier(account);
-			res.object = getFile(account, name, checksum);
-			return res;
+
+		boolean locked = isLocked(fileName);
+		String lockUser = "";
+		if (locked) {
+			lockUser = fileOwner(fileName);
+			throw new RemoteException("Le fichier est deja verouillé par " + lockUser);
 		} else {
-			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
+			modifyLock(fileName, account.userName, true);
+			Fichier fichier = getFile(account, fileName, checksum);
+			return fichier;
 		}
 	}
 
 	@Override
-	public Response unlockFile(Account account, String name) throws RemoteException {
+	public boolean pushFile(Account account, String fileName, byte[] fileContent) throws RemoteException {
 		if (!authServer.verifyAccount(account))
 			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + name;
-		File file = new File(filePath);
-		if (file.exists()) {
-			return (new Fichier(file.getName())).unlock_fichier(account);
-		} else {
-			throw new RemoteException("Ce fichier n'existe pas sur le serveur!");
-		}
-	}
 
-	@Override
-	public Response pushFile(Account account, String name, byte[] fileContent) throws RemoteException {
-		if (!authServer.verifyAccount(account))
-			throw new RemoteException("Ce compte n'existe pas ou le mot de passe est invalide");
-		String filePath = FILES_DIR_NAME + "/" + name;
+		String filePath = FILES_DIR_NAME + "/" + fileName;
 		File file = new File(filePath);
 		if (file.exists()) {
-			Fichier fichier = new Fichier(file.getName());
-			if (fichier.lockState()) {
-				if (fichier.lockByUser.equals(account.userName)) {
+			if (isLocked(fileName)) {
+				String fileOwner = fileOwner(fileName);
+				if (fileOwner(fileName).equals(account.userName)) {
 					try {
 						FileOutputStream stream = new FileOutputStream(filePath);
 						try {
 							stream.write(fileContent);
-							System.out.println("Le fichier serveur a été mis à jour avec la version locale.");
+							System.out.println("Le fichier " + fileName
+									+ " a été mis à jour avec la version locale de " + account.userName);
 						} catch (IOException e) {
 							System.err.println(e.getMessage());
+							return false;
 						} finally {
 							try {
 								if (stream != null)
@@ -203,24 +271,18 @@ public class FileServer implements FileServerInterface {
 						}
 					} catch (FileNotFoundException e) {
 						System.err.println(e.getMessage());
+						return false;
 					}
-					System.out.println(unlockFile(account, name).msg);
-					return new Response(1, "SUCCES: Le fichier est push sur le serveur");
+					modifyLock(fileName, "", false);
+					return true;
 				} else {
-					throw new RemoteException("Le fichier est verouille par: "+fichier.lockByUser);
+					throw new RemoteException("Le fichier est verouillé par: " + fileOwner);
 				}
 			} else {
-				throw new RemoteException("Please lock file first!");
-			}
-		} else {
-			System.out.println("Le fichier n'existe pas sur le serveur, auto creer un fichier");
-			if (createFile(account, name)) {
-				System.out.println(lockFile(account, name, "").msg);
-				return pushFile(account, name, fileContent);
-			} else {
-				throw new RemoteException("auto creer fichier echoue, push non realise");
+				throw new RemoteException("opération refusée : vous devez verrouiller d'abord le fichier.");
 			}
 		}
+		return false;
 	}
 
 	@Override
