@@ -120,7 +120,7 @@ public class FileServer implements FileServerInterface {
 		return text;
 	}
 
-	//changer la valeur boolean du fichier lock
+	//change le contenu du fichier lock correspondant à un fichier
 	private boolean modifyLock(String fileName, String username, boolean locked) {
 		try {
 			String lockPath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
@@ -129,6 +129,7 @@ public class FileServer implements FileServerInterface {
 			bufferedWriter.write(locked + "");
 			bufferedWriter.newLine();
 			if (locked) {
+				//écrire celui qui a vérouillé
 				bufferedWriter.write(username);
 				bufferedWriter.newLine();
 			}
@@ -142,7 +143,7 @@ public class FileServer implements FileServerInterface {
 		return false;
 	}
 
-	//check si le fichier est verouille en lisant le fichier lock
+	//retourne si le fichier est verouillé en lisant le fichier lock
 	private static boolean isLocked(String fileName) {
 		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
 		File file = new File(filePath);
@@ -153,7 +154,7 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
-	//check qui verouille le fichier
+	//retourne qui a vérouillé le fichier
 	private static String fileOwner(String fileName) {
 		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
 		File file = new File(filePath);
@@ -203,6 +204,7 @@ public class FileServer implements FileServerInterface {
 			if (locked) {
 				lockUser = fileOwner(file.getName());
 			}
+			//Instancie un objet fichier selon son verrouillage
 			Fichier fichier = new Fichier(file.getName(), locked, lockUser);
 			filesList.add(fichier);
 		}
@@ -232,7 +234,7 @@ public class FileServer implements FileServerInterface {
 		return fichier;
 	}
 
-	//metrre a jour le fichier lock puis effectuer un get
+	
 	@Override
 	public Fichier lockFile(Account account, String fileName, String checksum) throws RemoteException {
 		if (!authServer.verifyAccount(account))
@@ -244,13 +246,14 @@ public class FileServer implements FileServerInterface {
 			lockUser = fileOwner(fileName);
 			throw new RemoteException("Le fichier est deja verouillé par " + lockUser);
 		} else {
+			//Met à jour le fichier lock puis effectuer un get
 			modifyLock(fileName, account.userName, true);
 			Fichier fichier = getFile(account, fileName, checksum);
 			return fichier;
 		}
 	}
 
-	//check si le fichier est verouille et mettre a jour le fichier du serveur
+	//S'assure si le fichier est verouillé et mets à jour le fichier du serveur
 	@Override
 	public boolean pushFile(Account account, String fileName, byte[] fileContent) throws RemoteException {
 		if (!authServer.verifyAccount(account))
@@ -265,6 +268,7 @@ public class FileServer implements FileServerInterface {
 					try {
 						FileOutputStream stream = new FileOutputStream(filePath);
 						try {
+							//écrit le fichier sur le serveur
 							stream.write(fileContent);
 							System.out.println("Le fichier " + fileName
 									+ " a été mis à jour avec la version locale de " + account.userName);
@@ -283,6 +287,7 @@ public class FileServer implements FileServerInterface {
 						System.err.println(e.getMessage());
 						return false;
 					}
+					//déverrouille le fichier lorsque le push a réussi
 					modifyLock(fileName, "", false);
 					return true;
 				} else {
@@ -303,6 +308,7 @@ public class FileServer implements FileServerInterface {
 		final File filesFolder = new File(FILES_DIR_NAME);
 		for (final File file : filesFolder.listFiles()) {
 			try {
+				//lit le fichier sur le serveur
 				byte[] fileContent = Files.readAllBytes(file.toPath());
 				Fichier fichier = new Fichier(file.getName(), fileContent);
 				filesList.add(fichier);
