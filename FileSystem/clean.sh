@@ -1,2 +1,2 @@
-rm -rf files accounts
+rm -rf files accounts locks
 rm credentials
