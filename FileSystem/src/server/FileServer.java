@@ -120,6 +120,7 @@ public class FileServer implements FileServerInterface {
 		return text;
 	}
 
+	//changer la valeur boolean du fichier lock
 	private boolean modifyLock(String fileName, String username, boolean locked) {
 		try {
 			String lockPath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
@@ -141,6 +142,7 @@ public class FileServer implements FileServerInterface {
 		return false;
 	}
 
+	//check si le fichier est verouille en lisant le fichier lock
 	private static boolean isLocked(String fileName) {
 		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
 		File file = new File(filePath);
@@ -151,6 +153,7 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
+	//check qui verouille le fichier
 	private static String fileOwner(String fileName) {
 		String filePath = LOCKS_DIR_NAME + "/." + fileName + "_lock";
 		File file = new File(filePath);
@@ -229,6 +232,7 @@ public class FileServer implements FileServerInterface {
 		return fichier;
 	}
 
+	//metrre a jour le fichier lock puis effectuer un get
 	@Override
 	public Fichier lockFile(Account account, String fileName, String checksum) throws RemoteException {
 		if (!authServer.verifyAccount(account))
@@ -246,6 +250,7 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
+	//check si le fichier est verouille et mettre a jour le fichier du serveur
 	@Override
 	public boolean pushFile(Account account, String fileName, byte[] fileContent) throws RemoteException {
 		if (!authServer.verifyAccount(account))
