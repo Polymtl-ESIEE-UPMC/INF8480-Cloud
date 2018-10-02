@@ -5,10 +5,14 @@ import java.rmi.RemoteException;
 import shared.AuthServerInterface;
 import shared.FileServerInterface;
 
-public class CreateCommand extends Command{
+public class CreateCommand extends Command {
 
-    public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException{
+    public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException {
         boolean success = fileServer.createFile(account, fileName);
-        System.out.println("L'opération a " + ((success) ? "réussie." : "échouée."));
+        if (success) {
+            System.out.println(fileName + " a bien été créé.");
+        } else {
+            System.out.println("L'opération a échouée.");
+        }
     }
 }
