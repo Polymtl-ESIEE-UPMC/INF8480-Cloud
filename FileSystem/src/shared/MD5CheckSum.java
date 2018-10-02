@@ -10,6 +10,10 @@ import javax.xml.bind.DatatypeConverter;
 
 public final class MD5CheckSum {
 
+    /**
+     * Génère le hash MD5 d'un fichier sous forme d'un string
+     * filePath : le chemin du fichier à hasher
+     */
     public static String generateChecksum(String filePath) {
         try {
             byte[] fileContents = Files.readAllBytes(Paths.get(filePath));

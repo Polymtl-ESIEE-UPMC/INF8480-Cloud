@@ -29,6 +29,7 @@ public class Client {
 		Command command = null;
 		String fileName = "";
 		
+		//analyse les arguments envoyés au programme. Instancie la commande demandée
 		for (int i = 0; i < args.length && command == null; i++) {
 			try {
 				switch (args[i]) {
@@ -70,6 +71,7 @@ public class Client {
 
 		Client client = new Client(distantHostname);
 		if(command != null){
+			//exécute la commande demandée
 			client.run(command, fileName);
 		} else {
 			System.err.println("Veuillez entrer une commande!");
@@ -77,6 +79,7 @@ public class Client {
 		}
 	}
 
+	//Affiche l'aide sur les commandes
 	public static void printHelp() {
 		System.out.println("Liste des commandes :\n" + "-i ip_adress\n" + "list\n" + "create nomDeFichier\n" + "get nomDeFichier\n"
 				+ "push nomDeFichier\n" + "lock nomDeFichier\n" + "syncLocalDirectory\n");
@@ -92,6 +95,8 @@ public class Client {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
+
+		//Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if(distantServerHostname != null){
 			authServer = loadAuthServer(distantServerHostname);
 			fileServer = loadFileServer(distantServerHostname);
@@ -101,6 +106,7 @@ public class Client {
 		}
 	}
 
+	//Récupère le stub du serveur d'authentification
 	private AuthServerInterface loadAuthServer(String hostname) {
 		AuthServerInterface stub = null;
 
@@ -118,6 +124,7 @@ public class Client {
 		return stub;
 	}
 
+	//Récupère le stub du serveur de fichiers
 	private FileServerInterface loadFileServer(String hostname) {
 		FileServerInterface stub = null;
 
@@ -143,6 +150,7 @@ public class Client {
 					System.err.println("Votre fichier d'informations de compte n'a pas le format attendu.");
 					return;
 				}
+				//Exécute la commande par polymorphisme
 				command.run(account, fileServer, fileName);
 			} catch (RemoteException e) {
 				System.err.println("Erreur: " + e.getMessage());
@@ -150,6 +158,10 @@ public class Client {
 		}
 	}
 
+	/**
+	 * Lis le fichier d'informations de compte (s'il existe) et s'assure que le compte 
+	 * a un format valide
+	 */
 	private void checkExistingAccount() {
 		try {
 			BufferedReader fileReader = new BufferedReader(new FileReader("credentials"));
@@ -173,6 +185,9 @@ public class Client {
 		}
 	}
 
+	/**
+	 * Crée un compte utilisateur en demandant un nom d'utilisateur et un mot de passe
+	 */
 	private void createAccount() {
 		Scanner reader = new Scanner(System.in);
 		boolean validAccount = false;
@@ -200,6 +215,7 @@ public class Client {
 			}
 
 			try {
+				//Demande au serveur d'authentification de créer le compte
 				validAccount = authServer.newAccount(userName, pass);
 				if (validAccount) {
 					account = new Account(userName, pass);
