@@ -86,7 +86,6 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
-	// mettre filepath
 	private static List<String> readAllText(String filePath) {
 		List<String> text = new ArrayList<>();
 
