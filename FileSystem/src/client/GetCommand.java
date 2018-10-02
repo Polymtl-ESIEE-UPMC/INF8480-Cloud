@@ -15,11 +15,13 @@ public class GetCommand extends Command {
 
     public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException {
         String md5 = MD5CheckSum.generateChecksum(fileName);
+        //demande le fichier au serveur de fichiers
         Fichier fichier = fileServer.getFile(account, fileName, md5);
         if (fichier == null) {
             System.out.println("Le fichier local est déjà à jour avec la version du serveur.");
         } else {
             try {
+                //lis le fichier pour le sauvegarder localement
                 FileOutputStream stream = new FileOutputStream(fichier.name);
                 try {
                     stream.write(fichier.content);

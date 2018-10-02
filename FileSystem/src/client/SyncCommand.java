@@ -15,9 +15,11 @@ import shared.FileServerInterface;
 public class SyncCommand extends Command {
 
     public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException {
+        //récupère les fichiers sur le serveur de fichiers
         List<Fichier> files = fileServer.syncLocalDirectory(account);
         
         try {
+            //pour tous les fichiers retournés, les sauvegarder en local
 			for (final Fichier file : files) {
                 FileOutputStream stream = new FileOutputStream(file.name);
                 try {

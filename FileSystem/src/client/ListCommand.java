@@ -11,6 +11,7 @@ import shared.FileServerInterface;
 public class ListCommand extends Command{
 
     public void run(Account account, FileServerInterface fileServer, String fileName) throws RemoteException{
+        //récupère la liste des fichiers sur le serveur de fichiers
         List<Fichier> files = fileServer.listFiles(account);
         for(Fichier file : files){
             System.out.println(file);
