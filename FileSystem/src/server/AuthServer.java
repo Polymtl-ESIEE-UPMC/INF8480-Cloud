@@ -87,7 +87,7 @@ public class AuthServer implements AuthServerInterface {
 				userName = fileReader.readLine();
 				validPass = fileReader.readLine();
 			} catch (IOException e) {
-				System.err.println("?");
+				System.err.println("Un problème inconnu est survenu : " + e.getMessage());
 			} finally {
 				try {
 					if (fileReader != null)
