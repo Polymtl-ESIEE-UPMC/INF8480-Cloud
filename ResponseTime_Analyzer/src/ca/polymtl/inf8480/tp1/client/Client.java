@@ -10,6 +10,7 @@ import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 
 public class Client {
 	static int size;
+	//paramètre envoyé à la fonction RMI vide
 	static byte[] param;
 	public static void main(String[] args) {
 		String distantHostname = null;
