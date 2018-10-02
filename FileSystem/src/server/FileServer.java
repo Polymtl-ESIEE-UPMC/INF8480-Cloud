@@ -26,10 +26,13 @@ import shared.FileServerInterface;
 import shared.MD5CheckSum;
 
 public class FileServer implements FileServerInterface {
+	//dossier où les fichiers sont sauvegardés
 	private static final String FILES_DIR_NAME = "files";
+	//dossier où les locks sont sauvegardés
 	private static final String LOCKS_DIR_NAME = "locks";
 
 	public static void main(String[] args) {
+		//crée les dossiers nécessaires au fonctionnement du serveur s'il n'existent pas
 		File filesDir = new File(FILES_DIR_NAME);
 		filesDir.mkdir();
 		File locksDir = new File(LOCKS_DIR_NAME);
@@ -38,6 +41,7 @@ public class FileServer implements FileServerInterface {
 		server.run();
 	}
 
+	//la référence au serveur d'authentification
 	private AuthServerInterface authServer = null;
 
 	public FileServer() {
@@ -49,6 +53,7 @@ public class FileServer implements FileServerInterface {
 		authServer = loadAuthServer("127.0.0.1");
 	}
 
+	//récupère la référence au serveur d'authentification
 	private AuthServerInterface loadAuthServer(String hostname) {
 		AuthServerInterface stub = null;
 
@@ -66,6 +71,7 @@ public class FileServer implements FileServerInterface {
 		return stub;
 	}
 
+	//lance le serveur
 	private void run() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
@@ -86,6 +92,7 @@ public class FileServer implements FileServerInterface {
 		}
 	}
 
+	//Fonction qui retourne tout le texte d'un fichier passé en paramètre sous forme de ArrayList
 	private static List<String> readAllText(String filePath) {
 		List<String> text = new ArrayList<>();
 
@@ -188,7 +195,6 @@ public class FileServer implements FileServerInterface {
 		List<Fichier> filesList = new ArrayList<>();
 		final File filesFolder = new File(FILES_DIR_NAME);
 		for (final File file : filesFolder.listFiles()) {
-			// TODO: change with actual values
 			boolean locked = isLocked(file.getName());
 			String lockUser = "";
 			if (locked) {
