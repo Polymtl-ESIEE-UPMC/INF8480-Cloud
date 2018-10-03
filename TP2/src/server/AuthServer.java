@@ -21,15 +21,20 @@ import shared.AuthServerInterface;
 import shared.ServerDescription;
 
 public class AuthServer implements AuthServerInterface {
-	//dossier où les comptes sont sauvegardés
+	//dossier où les comptes clients sont sauvegardés
 	private static final String ACCOUNTS_DIR_NAME = "accounts";
+	//dossier où les répartiteurs sont sauvegardés
+	private static final String REPARTITEURS_DIR_NAME = "repartiteurs";
+
 	ServerDescription repartiteurDescription = null;
 	List<ServerDescription> serverDescriptions = null;
 
 	public static void main(String[] args) {
+		//crée les dossiers s'il n'existe pas
 		File accountsDir = new File(ACCOUNTS_DIR_NAME);
-		//crée le dossier s'il n'existe pas
 		accountsDir.mkdir();
+		File repartiteursDir = new File(REPARTITEURS_DIR_NAME);
+		repartiteursDir.mkdir();
 		AuthServer server = new AuthServer();
 		server.run();
 	}
@@ -71,27 +76,17 @@ public class AuthServer implements AuthServerInterface {
 	 */
 	@Override
 	public boolean newAccount(Account account) throws RemoteException {
-		String filePath = ACCOUNTS_DIR_NAME + "/" + account.userName;
-		File file = new File(filePath);
-		if(file.exists()) { 
-			// le compte existe déjà
-			return false;
-		}
+		return newAuth(account, ACCOUNTS_DIR_NAME);
 
-		try (PrintStream ps = new PrintStream(filePath)) {
-			//écrit les informations de compte dans le fichier
-			ps.println(account.userName);
-			ps.println(account.password);
-		} catch (FileNotFoundException e){
-			return false;
-		}
-
-		return true;
 	}
 
 	@Override
 	public boolean newRepartiteur(Account account) throws RemoteException {
-		String filePath = ACCOUNTS_DIR_NAME + "/" + account.userName;
+		return newAuth(account, REPARTITEURS_DIR_NAME);
+	}
+
+	private boolean newAuth(Account account, String dirName){
+		String filePath = dirName + "/" + account.userName;
 		File file = new File(filePath);
 		if(file.exists()) { 
 			// le compte existe déjà
@@ -109,13 +104,9 @@ public class AuthServer implements AuthServerInterface {
 		return true;
 	}
 
-	private boolean newAuth(Account account, String filePath){
-		return false;	
-	}
-
 	@Override
 	public boolean verifyAccount(Account account) throws RemoteException{
-		return false;
+		return verifyAuth(account, ACCOUNTS_DIR_NAME);
 	}
 
 	/**
@@ -123,7 +114,11 @@ public class AuthServer implements AuthServerInterface {
 	 */
 	@Override
 	public boolean verifyRepartiteur(Account account) throws RemoteException {
-		String filePath = ACCOUNTS_DIR_NAME + "/" + account.userName;
+		return verifyAuth(account, REPARTITEURS_DIR_NAME);
+	}
+
+	private boolean verifyAuth(Account account, String dirName){
+		String filePath = dirName + "/" + account.userName;
 		String userName = "", validPass = "";
 
 		try {
