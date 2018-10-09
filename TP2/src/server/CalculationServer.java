@@ -5,20 +5,49 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
+import shared.AuthServerInterface;
 import shared.CalculationServerInterface;
 
 public class CalculationServer implements CalculationServerInterface {
+	private AuthServerInterface authServer;
 
 	public static void main(String[] args) {
-		CalculationServer server = new CalculationServer();
+		String distantHostname = null;
+		if (args.length > 0) {
+			// analyse les arguments envoyés au programme. Instancie la commande demandée
+			for (int i = 0; i < args.length && command == null; i++) {
+				try {
+					switch (args[i]) {
+					case "-i":
+						distantHostname = args[++i];
+						break;
+					}
+				} catch (IndexOutOfBoundsException e) {
+					e.printStackTrace();
+					return;
+				}
+			}
+		}
+		CalculationServer server = new CalculationServer(distantHostname);
 		server.run();
 	}
 
-	public CalculationServer() {
+	public CalculationServer(String distantHostname) {
 		super();
+
+		if (System.getSecurityManager() == null) {
+			System.setSecurityManager(new SecurityManager());
+		}
+
+		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
+		if (distantServerHostname != null) {
+			authServer = loadAuthServer(distantHostname);
+		} else {
+			authServer = loadAuthServer("127.0.0.1");
+		}
 	}
 
-	//lance le serveur
+	// lance le serveur
 	private void run() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
@@ -37,5 +66,23 @@ public class CalculationServer implements CalculationServerInterface {
 		} catch (Exception e) {
 			System.err.println("Erreur: " + e.getMessage());
 		}
+	}
+
+	// Récupère le stub du serveur d'authentification
+	private AuthServerInterface loadAuthServer(String hostname) {
+		AuthServerInterface stub = null;
+
+		try {
+			Registry registry = LocateRegistry.getRegistry(hostname);
+			stub = (AuthServerInterface) registry.lookup("authServer");
+		} catch (NotBoundException e) {
+			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
+		} catch (AccessException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		} catch (RemoteException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		}
+
+		return stub;
 	}
 }
