@@ -4,12 +4,16 @@ import java.rmi.ConnectException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.List;
 
 import shared.AuthServerInterface;
 import shared.CalculationServerInterface;
+import shared.OperationTodo;
 
 public class CalculationServer implements CalculationServerInterface {
 	private AuthServerInterface authServer;
+	private List<OperationTodo> tasks;
 
 	public static void main(String[] args) {
 		String distantHostname = null;
@@ -38,6 +42,8 @@ public class CalculationServer implements CalculationServerInterface {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
+
+		tasks = new ArrayList<OperationTodo>();
 
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantServerHostname != null) {
@@ -84,5 +90,9 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 
 		return stub;
+	}
+	
+	public boolean queueTask(OperationTodo operation){
+		return tasks.add(operation);
 	}
 }
