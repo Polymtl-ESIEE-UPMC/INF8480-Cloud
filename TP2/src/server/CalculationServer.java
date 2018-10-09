@@ -4,19 +4,22 @@ import java.rmi.ConnectException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import shared.AuthServerInterface;
 import shared.CalculationServerInterface;
 import shared.OperationTodo;
 
 public class CalculationServer implements CalculationServerInterface {
+	static final private int DEFAULT_CAPACITY = 10;
+
 	private AuthServerInterface authServer;
-	private List<OperationTodo> tasks;
+	private Queue<OperationTodo> tasks; //list of operations todo
 
 	public static void main(String[] args) {
 		String distantHostname = null;
+		int capacity = null;
 		if (args.length > 0) {
 			// analyse les arguments envoyés au programme. Instancie la commande demandée
 			for (int i = 0; i < args.length && command == null; i++) {
@@ -25,26 +28,39 @@ public class CalculationServer implements CalculationServerInterface {
 					case "-i":
 						distantHostname = args[++i];
 						break;
+					case "-c":
+						capacity = Integer.parseInt(args[++i]);
+						break;
+					default:
+						System.err.println("Mauvaise commande : " + args[i]);
+						printHelp();
+						return;	
 					}
 				} catch (IndexOutOfBoundsException e) {
 					e.printStackTrace();
 					return;
 				}
 			}
+		}else{
+			System.err.println("Capacite default : " + DEFAULT_CAPACITY);
 		}
-		CalculationServer server = new CalculationServer(distantHostname);
+		CalculationServer server = new CalculationServer(distantHostname, capacity);
 		server.run();
 	}
 
-	public CalculationServer(String distantHostname) {
+	public CalculationServer(String distantHostnamem, int capacity) {
 		super();
 
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
-		tasks = new ArrayList<OperationTodo>();
-
+		if(capacity = null){
+			tasks = new ArrayBlockingQueue<OperationTodo>(DEFAULT_CAPACITY);
+		}else{
+			tasks = new ArrayBlockingQueue<OperationTodo>(capacity);
+		}
+		
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantServerHostname != null) {
 			authServer = loadAuthServer(distantHostname);
@@ -92,6 +108,7 @@ public class CalculationServer implements CalculationServerInterface {
 		return stub;
 	}
 	
+	//ask task to queue
 	public boolean queueTask(OperationTodo operation){
 		return tasks.add(operation);
 	}
