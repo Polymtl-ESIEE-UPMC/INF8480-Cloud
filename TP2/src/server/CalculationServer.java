@@ -1,6 +1,9 @@
 package server;
 
+import java.rmi.AccessException;
 import java.rmi.ConnectException;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
@@ -19,10 +22,10 @@ public class CalculationServer implements CalculationServerInterface {
 
 	public static void main(String[] args) {
 		String distantHostname = null;
-		int capacity = null;
+		int capacity = DEFAULT_CAPACITY;
 		if (args.length > 0) {
-			// analyse les arguments envoyés au programme. Instancie la commande demandée
-			for (int i = 0; i < args.length && command == null; i++) {
+			// analyse les arguments envoyés au programme
+			for (int i = 0; i < args.length; i++) {
 				try {
 					switch (args[i]) {
 					case "-i":
@@ -33,7 +36,6 @@ public class CalculationServer implements CalculationServerInterface {
 						break;
 					default:
 						System.err.println("Mauvaise commande : " + args[i]);
-						printHelp();
 						return;	
 					}
 				} catch (IndexOutOfBoundsException e) {
@@ -48,21 +50,17 @@ public class CalculationServer implements CalculationServerInterface {
 		server.run();
 	}
 
-	public CalculationServer(String distantHostnamem, int capacity) {
+	public CalculationServer(String distantHostname, int capacity) {
 		super();
 
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
-		if(capacity = null){
-			tasks = new ArrayBlockingQueue<OperationTodo>(DEFAULT_CAPACITY);
-		}else{
-			tasks = new ArrayBlockingQueue<OperationTodo>(capacity);
-		}
+		tasks = new ArrayBlockingQueue<OperationTodo>(capacity);
 		
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
-		if (distantServerHostname != null) {
+		if (distantHostname != null) {
 			authServer = loadAuthServer(distantHostname);
 		} else {
 			authServer = loadAuthServer("127.0.0.1");
