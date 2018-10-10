@@ -104,6 +104,10 @@ public class CalculationServer implements CalculationServerInterface {
 
 		return stub;
 	}
+
+	/*
+	 * Méthodes accessibles par RMI. 
+	 */
 	public int remainingCapacity(){
 		return tasks.remainingCapacity();
 	}
