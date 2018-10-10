@@ -7,8 +7,7 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.Queue;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import shared.AuthServerInterface;
 import shared.CalculationServerInterface;
@@ -18,7 +17,7 @@ public class CalculationServer implements CalculationServerInterface {
 	static final private int DEFAULT_CAPACITY = 10;
 
 	private AuthServerInterface authServer;
-	private Queue<OperationTodo> tasks; //list of operations todo
+	private LinkedBlockingQueue<OperationTodo> tasks; //list of operations todo
 
 	public static void main(String[] args) {
 		String distantHostname = null;
@@ -57,7 +56,7 @@ public class CalculationServer implements CalculationServerInterface {
 			System.setSecurityManager(new SecurityManager());
 		}
 
-		tasks = new ArrayBlockingQueue<OperationTodo>(capacity);
+		tasks = new LinkedBlockingQueue<OperationTodo>(capacity);
 		
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantHostname != null) {
@@ -105,9 +104,18 @@ public class CalculationServer implements CalculationServerInterface {
 
 		return stub;
 	}
-	
+	public int remainingCapacity(){
+		return tasks.remainingCapacity();
+	}
 	//ask task to queue
 	public boolean queueTask(OperationTodo operation){
 		return tasks.add(operation);
+	}
+
+	public int calculate(){
+		while(!tasks.isEmpty()){
+			OperationTodo todo = tasks.poll();
+		}
+		return 0;
 	}
 }

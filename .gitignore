@@ -1,2 +1,5 @@
 *.jar
 *.class
+/.gradle/
+/.project
+/.settings/
