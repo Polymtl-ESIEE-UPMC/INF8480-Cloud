@@ -27,8 +27,8 @@ public class Client {
 		}
 
 		String fileName = "";
-		
-		//analyse les arguments envoyés au programme. Instancie la commande demandée
+
+		// analyse les arguments envoyés au programme
 		for (int i = 0; i < args.length; i++) {
 			try {
 				switch (args[i]) {
@@ -36,53 +36,53 @@ public class Client {
 					distantHostname = args[++i];
 					break;
 				default:
-					System.err.println("Mauvaise commande : " + args[i]);
-					printHelp();
+					fileName = args[i];
 					return;
 				}
 			} catch (IndexOutOfBoundsException e) {
-				System.err.println("Veuillez entrer un nom de fichier");
+				System.err.println("Paramètres invalides");
+				printHelp();
 				return;
 			}
 		}
 
 		Client client = new Client(distantHostname);
-		if(fileName != null){
-			//exécute la commande demandée
+		if (fileName != null) {
+			// envoie les opérations au répartiteur
 			client.run(fileName);
 		} else {
-			System.err.println("Veuillez entrer une commande!");
+			System.err.println("Veuillez entrer un fichier d'opérations à effectuer!");
 			printHelp();
 		}
 	}
 
-	//Affiche l'aide sur les commandes
+	// Affiche l'aide sur les commandes
 	public static void printHelp() {
 		System.out.println("Liste des commandes :\n" + "-i ip_adress\n");
 	}
-	
+
 	private AuthServerInterface authServer = null;
 	private RepartiteurInterface repartiteur = null;
 	private Account account;
 
 	public Client(String distantServerHostname) {
 		super();
-		
+
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
-		//Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
-		if(distantServerHostname != null){
+		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
+		if (distantServerHostname != null) {
 			authServer = loadAuthServer(distantServerHostname);
-			repartiteur = loadRepartiteur(distantServerHostname);		
-		}else{
+			repartiteur = loadRepartiteur(distantServerHostname);
+		} else {
 			authServer = loadAuthServer("127.0.0.1");
 			repartiteur = loadRepartiteur("127.0.0.1");
 		}
 	}
 
-	//Récupère le stub du serveur d'authentification
+	// Récupère le stub du serveur d'authentification
 	private AuthServerInterface loadAuthServer(String hostname) {
 		AuthServerInterface stub = null;
 
@@ -100,7 +100,7 @@ public class Client {
 		return stub;
 	}
 
-	//Récupère le stub du serveur d'authentification
+	// Récupère le stub du serveur d'authentification
 	private RepartiteurInterface loadRepartiteur(String hostname) {
 		RepartiteurInterface stub = null;
 
@@ -121,21 +121,21 @@ public class Client {
 	private void run(String fileName) {
 		if (repartiteur != null && authServer != null) {
 			// try {
-				checkExistingAccount();
-				if (account.userName == null || account.password == null) {
-					System.err.println("Votre fichier d'informations de compte n'a pas le format attendu.");
-					return;
-				}
-				//Exécute la commande par polymorphisme
+			checkExistingAccount();
+			if (account.userName == null || account.password == null) {
+				System.err.println("Votre fichier d'informations de compte n'a pas le format attendu.");
+				return;
+			}
+			// Exécute la commande par polymorphisme
 			// } catch (RemoteException e) {
-			// 	System.err.println("Erreur: " + e.getMessage());
+			// System.err.println("Erreur: " + e.getMessage());
 			// }
 		}
 	}
 
 	/**
-	 * Lis le fichier d'informations de compte (s'il existe) et s'assure que le compte 
-	 * a un format valide
+	 * Lis le fichier d'informations de compte (s'il existe) et s'assure que le
+	 * compte a un format valide
 	 */
 	private void checkExistingAccount() {
 		try {
@@ -161,7 +161,8 @@ public class Client {
 	}
 
 	/**
-	 * Crée un compte utilisateur en demandant un nom d'utilisateur et un mot de passe
+	 * Crée un compte utilisateur en demandant un nom d'utilisateur et un mot de
+	 * passe
 	 */
 	private void createAccount() {
 		Scanner reader = new Scanner(System.in);
@@ -190,7 +191,7 @@ public class Client {
 			}
 
 			try {
-				//Demande au serveur d'authentification de créer le compte
+				// Demande au serveur d'authentification de créer le compte
 				Account tempAccount = new Account(userName, pass);
 				validAccount = authServer.newAccount(tempAccount);
 				if (validAccount) {
