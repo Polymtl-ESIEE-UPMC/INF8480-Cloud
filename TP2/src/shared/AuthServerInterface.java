@@ -2,6 +2,7 @@ package shared;
 
 import java.rmi.Remote;
 import java.rmi.RemoteException;
+import java.rmi.server.ServerNotActiveException;
 import java.util.List;
 
 //Interface pour les fonctions du serveur d'authentification
@@ -11,6 +12,6 @@ public interface AuthServerInterface extends Remote {
 	boolean registerCalculationServer(ServerDescription serverDescription) throws RemoteException;
 	boolean verifyAccount(Account account) throws RemoteException;
 	boolean verifyRepartiteur(Account account) throws RemoteException;
-	ServerDescription getRepartiteur() throws RemoteException;
+	String getRepartiteurIp() throws RemoteException;
 	List<ServerDescription> getCalculationServers() throws RemoteException;
 }

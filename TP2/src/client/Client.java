@@ -10,6 +10,8 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 import shared.Account;
@@ -18,10 +20,13 @@ import shared.RepartiteurInterface;
 
 public class Client {
 
+	private static final String CREDENTIALS_FILENAME = "credentials";
+
 	public static void main(String[] args) {
 		String distantHostname = null;
 
 		if (args.length < 1) {
+			System.err.println("Veuillez entrer au moins un paramètre");
 			printHelp();
 			return;
 		}
@@ -37,7 +42,7 @@ public class Client {
 					break;
 				default:
 					fileName = args[i];
-					return;
+					break;
 				}
 			} catch (IndexOutOfBoundsException e) {
 				System.err.println("Paramètres invalides");
@@ -46,8 +51,8 @@ public class Client {
 			}
 		}
 
-		Client client = new Client(distantHostname);
 		if (fileName != null) {
+			Client client = new Client(distantHostname);
 			// envoie les opérations au répartiteur
 			client.run(fileName);
 		} else {
@@ -58,7 +63,7 @@ public class Client {
 
 	// Affiche l'aide sur les commandes
 	public static void printHelp() {
-		System.out.println("Liste des commandes :\n" + "-i ip_adress\n");
+		System.out.println("Liste des commandes :\n" + "-i ip_adress\nfileName");
 	}
 
 	private AuthServerInterface authServer = null;
@@ -75,10 +80,18 @@ public class Client {
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantServerHostname != null) {
 			authServer = loadAuthServer(distantServerHostname);
-			repartiteur = loadRepartiteur(distantServerHostname);
 		} else {
 			authServer = loadAuthServer("127.0.0.1");
-			repartiteur = loadRepartiteur("127.0.0.1");
+		}
+
+		if (authServer != null) {
+			try {
+				String repartiteurIp = authServer.getRepartiteurIp();
+				System.out.println(repartiteurIp);
+				repartiteur = loadRepartiteur(repartiteurIp);
+			} catch (Exception e) {
+				System.out.println(e.getMessage());
+			}
 		}
 	}
 
@@ -118,18 +131,20 @@ public class Client {
 		return stub;
 	}
 
-	private void run(String fileName) {
+	private void run(String filePath) {
 		if (repartiteur != null && authServer != null) {
-			// try {
-			checkExistingAccount();
-			if (account.userName == null || account.password == null) {
-				System.err.println("Votre fichier d'informations de compte n'a pas le format attendu.");
-				return;
+			try {
+				checkExistingAccount();
+				if (account.userName == null || account.password == null) {
+					System.err.println("Votre fichier d'informations de compte n'a pas le format attendu.");
+					return;
+				}
+				List<String> operations = readAllText(filePath);
+				int reponse = repartiteur.handleOperations(operations);
+				System.out.println(reponse);
+			} catch (RemoteException e) {
+				System.err.println("Erreur: " + e.getMessage());
 			}
-			// Exécute la commande par polymorphisme
-			// } catch (RemoteException e) {
-			// System.err.println("Erreur: " + e.getMessage());
-			// }
 		}
 	}
 
@@ -139,7 +154,7 @@ public class Client {
 	 */
 	private void checkExistingAccount() {
 		try {
-			BufferedReader fileReader = new BufferedReader(new FileReader("credentials"));
+			BufferedReader fileReader = new BufferedReader(new FileReader(CREDENTIALS_FILENAME));
 			try {
 				String login = fileReader.readLine();
 				String password = fileReader.readLine();
@@ -196,7 +211,7 @@ public class Client {
 				validAccount = authServer.newAccount(tempAccount);
 				if (validAccount) {
 					account = tempAccount;
-					try (PrintStream ps = new PrintStream("credentials")) {
+					try (PrintStream ps = new PrintStream(CREDENTIALS_FILENAME)) {
 						ps.println(userName);
 						ps.println(pass);
 						System.out.println("Création du compte réussie!");
@@ -216,5 +231,34 @@ public class Client {
 		}
 
 		reader.close();
+	}
+
+	// Fonction qui retourne tout le texte d'un fichier passé en paramètre sous f
+	// rme de ArrayList
+	private static List<String> readAllText(String filePath) {
+		List<String> text = new ArrayList<String>();
+
+		try {
+			BufferedReader fileReader = new BufferedReader(new FileReader(filePath));
+			try {
+				String line;
+				while ((line = fileReader.readLine()) != null) {
+					text.add(line);
+				}
+			} catch (IOException e) {
+				System.err.println("Un problème inconnu est survenu : " + e.getMessage());
+			} finally {
+				try {
+					if (fileReader != null)
+						fileReader.close();
+				} catch (IOException e) {
+					System.err.println("Un problème inconnu est survenu : " + e.getMessage());
+				}
+			}
+		} catch (FileNotFoundException e) {
+			System.err.println(e.getMessage());
+		}
+
+		return text;
 	}
 }

@@ -12,6 +12,8 @@ import java.rmi.ConnectException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.server.RemoteServer;
+import java.rmi.server.ServerNotActiveException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +28,7 @@ public class AuthServer implements AuthServerInterface {
 	//dossier où les répartiteurs sont sauvegardés
 	private static final String REPARTITEURS_DIR_NAME = "repartiteurs";
 
-	ServerDescription repartiteurDescription = null;
+	String repartiteurIp = null;
 	List<ServerDescription> serverDescriptions = null;
 
 	public static void main(String[] args) {
@@ -81,7 +83,9 @@ public class AuthServer implements AuthServerInterface {
 	}
 
 	@Override
-	public boolean newRepartiteur(Account account) throws RemoteException {
+	public boolean newRepartiteur(Account account) throws RemoteException, ServerNotActiveException {
+		repartiteurIp = RemoteServer.getClientHost();
+		System.out.println("Repartiteur registered at : " + repartiteurIp);
 		return newAuth(account, REPARTITEURS_DIR_NAME);
 	}
 
@@ -146,8 +150,8 @@ public class AuthServer implements AuthServerInterface {
 	}
 
 	@Override
-	public ServerDescription getRepartiteur() throws RemoteException{
-		return repartiteurDescription;
+	public String getRepartiteurIp() throws RemoteException{
+		return repartiteurIp;
 	}
 	
 	@Override
