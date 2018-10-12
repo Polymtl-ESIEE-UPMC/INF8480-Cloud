@@ -25,6 +25,9 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class Repartiteur implements RepartiteurInterface {
 
@@ -44,6 +47,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
+	private List<Future<Integer>> resultList = null;
+	ExecutorService executorService = null;
 
 	public Repartiteur(String authServerHostName) {
 		super();
@@ -100,6 +105,9 @@ public class Repartiteur implements RepartiteurInterface {
 		} catch (RemoteException e) {
 			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
+		//creer ThreadPool size = nombre de CalculationServer
+		executorService = Executors.newFixedThreadPool(calculationServers.size());
+		resultList = new ArrayList<>();
 	}
 
 	/**
@@ -171,6 +179,47 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 		
 		// TODO: Faire un bon algorithme
+		int result = 0;
+		for (int i = 0; i < list.size(); i++) {
+			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i+1));
+			result = (result + calculationServers.get(0).calculateOperations(task)) % 4000;
+		}
+		return result;
+	}
+
+	//choisir mode securise || non-securise
+	@Override
+	public int handleOperations(List<String> operations, String mode) throws RemoteException {
+		List<OperationTodo> list = new ArrayList<>();
+		for (String op : operations) {
+			String[] algo = op.split(" ");
+			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
+		}
+
+		switch(mode){
+			case "securise":
+				List<Future<Integer>> secondResultList = new ArrayList<>();
+				break;
+			case "non-securise":
+				int needMachine = 0; //WORKING ON
+				for(OperationTodo op:list){
+					executorService.submit(()->{ //lambda Java 8 feature
+						int result = 0;
+						int i = 0;
+						do{
+							try{
+								calculationServers.get(i).calculateOperations(list);
+							}catch(RemoteException e){
+								e.printStackTrace();
+							}
+						}while(result == -1);
+					});
+				}
+				break;
+			default:
+				throw new RemoteException("Erreur: mode non reconnu");
+		}
+		
 		int result = 0;
 		for (int i = 0; i < list.size(); i++) {
 			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i+1));
