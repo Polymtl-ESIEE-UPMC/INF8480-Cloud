@@ -44,7 +44,7 @@ public class InterfaceLoader{
 		return stub;
     }
     
-    // Récupère le stub du serveur d'authentification
+    // Récupère le stub du serveur de calcul
 	public static CalculationServerInterface loadCalculationServer(String hostname) {
 		CalculationServerInterface stub = null;
 
