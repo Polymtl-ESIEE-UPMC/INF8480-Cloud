@@ -4,3 +4,7 @@
 /credentialsRepartiteur
 /accounts/*
 /repartiteurs/*
+*.gradle
+*.project
+/.gradle/
+/.settings/

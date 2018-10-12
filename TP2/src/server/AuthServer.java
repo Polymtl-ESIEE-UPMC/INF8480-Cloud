@@ -21,7 +21,6 @@ import java.util.List;
 import shared.Account;
 import shared.AuthServerInterface;
 import shared.CalculationServerInfo;
-import shared.ServerDescription;
 
 public class AuthServer implements AuthServerInterface {
 	//dossier où les comptes clients sont sauvegardés

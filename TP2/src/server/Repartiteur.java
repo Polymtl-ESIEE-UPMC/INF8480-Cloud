@@ -15,7 +15,6 @@ import shared.CalculationServerInterface;
 import shared.InterfaceLoader;
 import shared.OperationTodo;
 import shared.RepartiteurInterface;
-import shared.ServerDescription;
 import shared.Account;
 
 import java.io.BufferedReader;
