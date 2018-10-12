@@ -9,7 +9,6 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import shared.AuthServerInterface;
 import shared.CalculationServerInfo;
@@ -61,7 +60,6 @@ public class CalculationServer implements CalculationServerInterface {
 	private int capacity;
 	private int badPercent;
 	private AuthServerInterface authServer;
-	private LinkedBlockingQueue<OperationTodo> tasks; // list of operations todo
 	private Random random;
 
 	public CalculationServer(String distantHostname, int capacity, int badPercent) {
@@ -73,7 +71,6 @@ public class CalculationServer implements CalculationServerInterface {
 
 		this.capacity = capacity;
 		this.badPercent = badPercent;
-		tasks = new LinkedBlockingQueue<OperationTodo>(capacity);
 		random = new Random();
 
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par déf
@@ -115,22 +112,6 @@ public class CalculationServer implements CalculationServerInterface {
 			System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
 			System.err.println("Erreur: " + e.getMessage());
 		}
-	}
-
-	public int remainingCapacity() {
-		return tasks.remainingCapacity();
-	}
-
-	// ask task to queue
-	public boolean queueTask(OperationTodo operation) {
-		return tasks.add(operation);
-	}
-
-	public int calculate() {
-		while (!tasks.isEmpty()) {
-			OperationTodo todo = tasks.poll();
-		}
-		return 0;
 	}
 
 	public boolean acceptTask(int opCount) {
