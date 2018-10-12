@@ -1,3 +1,5 @@
+package shared;
+
 /**
  * Methodes utilitaires pour effectuer les operations du TP2.
  * 
