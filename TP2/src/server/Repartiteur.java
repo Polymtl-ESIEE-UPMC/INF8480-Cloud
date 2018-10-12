@@ -6,10 +6,16 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.rmi.server.ServerNotActiveException;
 import java.rmi.server.UnicastRemoteObject;
 
 import shared.AuthServerInterface;
+import shared.CalculationServerInfo;
+import shared.CalculationServerInterface;
+import shared.InterfaceLoader;
+import shared.OperationTodo;
 import shared.RepartiteurInterface;
+import shared.ServerDescription;
 import shared.Account;
 
 import java.io.BufferedReader;
@@ -34,25 +40,27 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private AuthServerInterface authServer = null;
+	private List<CalculationServerInterface> calculationServers = null;
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
 	
 	public Repartiteur(String authServerHostName) {
 		super();
-
-		if (authServerHostName != null) {
-			authServer = loadAuthServer(authServerHostName);
-		} else {
-			authServer = loadAuthServer("127.0.0.1");
-		}
-	}
-
-	private void run() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
+		if (authServerHostName != null) {
+			authServer = InterfaceLoader.loadAuthServer(authServerHostName);
+		} else {
+			authServer = InterfaceLoader.loadAuthServer("127.0.0.1");
+		}
+
+		calculationServers = new ArrayList<>();
+	}
+
+	private void run() {
 		try {
 			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject
 					.exportObject(this, 0);
@@ -70,9 +78,19 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 
 		checkExistingRepartiteur();
+
 		if (account.userName == null || account.password == null) {
 			System.err.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
 			return;
+		}
+
+		try {
+			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
+				System.out.println(sd.ip);
+				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip));
+			}
+		} catch (RemoteException e) {
+			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
 	}
 
@@ -132,31 +150,23 @@ public class Repartiteur implements RepartiteurInterface {
 		reader.close();
 	}
 	
-	// Récupère le stub du serveur d'authentification
-	private AuthServerInterface loadAuthServer(String hostname) {
-		AuthServerInterface stub = null;
-
-		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
-			stub = (AuthServerInterface) registry.lookup("authServer");
-		} catch (NotBoundException e) {
-			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
-		} catch (AccessException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		} catch (RemoteException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		}
-
-		return stub;
-	}
-
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
 
 	@Override
 	public int handleOperations(List<String> operations) throws RemoteException{
-		//TODO
-		return 0;
+		//TODO: Faire un bon algorithme
+		List<OperationTodo> list = new ArrayList<>();
+		for(String op : operations){
+			String[] algo = op.split(" ");
+			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
+		}
+
+		int result = 0;
+		for(OperationTodo op : list){
+			result = (result + calculationServers.get(0).calculateOperations(op)) % 4000;
+		}
+		return result;
 	}	
 }

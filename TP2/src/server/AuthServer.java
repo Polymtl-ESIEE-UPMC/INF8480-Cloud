@@ -20,6 +20,7 @@ import java.util.List;
 
 import shared.Account;
 import shared.AuthServerInterface;
+import shared.CalculationServerInfo;
 import shared.ServerDescription;
 
 public class AuthServer implements AuthServerInterface {
@@ -29,7 +30,7 @@ public class AuthServer implements AuthServerInterface {
 	private static final String REPARTITEURS_DIR_NAME = "repartiteurs";
 
 	String repartiteurIp = null;
-	List<ServerDescription> serverDescriptions = null;
+	List<CalculationServerInfo> serverDescriptions = null;
 
 	public static void main(String[] args) {
 		//crée les dossiers s'il n'existe pas
@@ -43,14 +44,14 @@ public class AuthServer implements AuthServerInterface {
 
 	public AuthServer() {
 		super();
-		serverDescriptions = new ArrayList<ServerDescription>();
-	}
-
-	private void run() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
+		serverDescriptions = new ArrayList<CalculationServerInfo>();
+	}
+
+	private void run() {
 		try {
 			AuthServerInterface stub = (AuthServerInterface) UnicastRemoteObject
 					.exportObject(this, 0);
@@ -83,10 +84,20 @@ public class AuthServer implements AuthServerInterface {
 	}
 
 	@Override
-	public boolean newRepartiteur(Account account) throws RemoteException, ServerNotActiveException {
-		repartiteurIp = RemoteServer.getClientHost();
-		System.out.println("Repartiteur registered at : " + repartiteurIp);
-		return newAuth(account, REPARTITEURS_DIR_NAME);
+	public boolean newRepartiteur(Account account) throws RemoteException {
+		try {
+			repartiteurIp = RemoteServer.getClientHost();
+		} catch (ServerNotActiveException e) {
+			System.err.println("Could not get the Repartiteur ip adress.");
+			return false;
+		}
+
+		if (newAuth(account, REPARTITEURS_DIR_NAME)) {
+			System.out.println("Repartiteur registered at : " + repartiteurIp);
+			return true;
+		}
+		
+		return false;
 	}
 
 	private boolean newAuth(Account account, String dirName){
@@ -155,12 +166,20 @@ public class AuthServer implements AuthServerInterface {
 	}
 	
 	@Override
-	public boolean registerCalculationServer(ServerDescription serverDescription) throws RemoteException{
+	public boolean registerCalculationServer(CalculationServerInfo serverDescription) throws RemoteException{
+		try {
+			String clientIp = RemoteServer.getClientHost();
+			serverDescription.ip = clientIp;
+		} catch (ServerNotActiveException e) {
+			System.err.println("Could not get the Repartiteur ip adress.");
+			return false;
+		}
+		
 		return serverDescriptions.add(serverDescription);
 	}
 	
 	@Override
-	public List<ServerDescription> getCalculationServers() throws RemoteException{
+	public List<CalculationServerInfo> getCalculationServers() throws RemoteException{
 		return serverDescriptions;
 	}
 }

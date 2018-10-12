@@ -6,4 +6,5 @@ import java.rmi.RemoteException;
 //Interface pour les fonctions du serveur de calculs
 
 public interface CalculationServerInterface extends Remote {
+    public int calculateOperations(OperationTodo operation) throws RemoteException;
 }

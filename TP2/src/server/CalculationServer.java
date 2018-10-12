@@ -10,18 +10,18 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import shared.AuthServerInterface;
+import shared.CalculationServerInfo;
 import shared.CalculationServerInterface;
+import shared.InterfaceLoader;
 import shared.OperationTodo;
 
 public class CalculationServer implements CalculationServerInterface {
-	static final private int DEFAULT_CAPACITY = 10;
-
-	private AuthServerInterface authServer;
-	private LinkedBlockingQueue<OperationTodo> tasks; //list of operations todo
+	private static final int DEFAULT_CAPACITY = 4;
 
 	public static void main(String[] args) {
 		String distantHostname = null;
 		int capacity = DEFAULT_CAPACITY;
+		int badPercent = 0;
 		if (args.length > 0) {
 			// analyse les arguments envoyés au programme
 			for (int i = 0; i < args.length; i++) {
@@ -33,43 +33,58 @@ public class CalculationServer implements CalculationServerInterface {
 					case "-c":
 						capacity = Integer.parseInt(args[++i]);
 						break;
+					case "-m":
+						badPercent = Integer.parseInt(args[++i]);
+						break;
 					default:
 						System.err.println("Mauvaise commande : " + args[i]);
-						return;	
+						return;
 					}
 				} catch (IndexOutOfBoundsException e) {
 					e.printStackTrace();
 					return;
 				}
 			}
-		}else{
-			System.err.println("Capacite default : " + DEFAULT_CAPACITY);
 		}
-		CalculationServer server = new CalculationServer(distantHostname, capacity);
+
+		CalculationServer server = new CalculationServer(distantHostname, capacity, badPercent);
 		server.run();
 	}
 
-	public CalculationServer(String distantHostname, int capacity) {
+	// Affiche l'aide sur les commandes
+	public static void printHelp() {
+		System.out.println("Liste des commandes :\n" + "-i ip_adress\n-m %malicieux\n-c capacité");
+	}
+
+	private int capacity;
+	private int badPercent;
+	private AuthServerInterface authServer;
+	private LinkedBlockingQueue<OperationTodo> tasks; // list of operations todo
+
+	public CalculationServer(String distantHostname, int capacity, int badPercent) {
 		super();
 
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
+		this.capacity = capacity;
+		this.badPercent = badPercent;
 		tasks = new LinkedBlockingQueue<OperationTodo>(capacity);
-		
-		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
+
+		// Récupère le stub selon l'adresse passée en paramètre (localhost par déf
+		// ut)
 		if (distantHostname != null) {
-			authServer = loadAuthServer(distantHostname);
+			authServer = InterfaceLoader.loadAuthServer(distantHostname);
 		} else {
-			authServer = loadAuthServer("127.0.0.1");
+			authServer = InterfaceLoader.loadAuthServer("127.0.0.1");
 		}
 	}
 
 	// lance le serveur
 	private void run() {
-		if (System.getSecurityManager() == null) {
-			System.setSecurityManager(new SecurityManager());
+		if (authServer == null) {
+			return;
 		}
 
 		try {
@@ -85,41 +100,40 @@ public class CalculationServer implements CalculationServerInterface {
 		} catch (Exception e) {
 			System.err.println("Erreur: " + e.getMessage());
 		}
-	}
 
-	// Récupère le stub du serveur d'authentification
-	private AuthServerInterface loadAuthServer(String hostname) {
-		AuthServerInterface stub = null;
-
+		CalculationServerInfo info = new CalculationServerInfo("", 0, capacity);
 		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
-			stub = (AuthServerInterface) registry.lookup("authServer");
-		} catch (NotBoundException e) {
-			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
-		} catch (AccessException e) {
-			System.out.println("Erreur: " + e.getMessage());
+			boolean success = authServer.registerCalculationServer(info);
+			if (!success) {
+				System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
+			}
 		} catch (RemoteException e) {
-			System.out.println("Erreur: " + e.getMessage());
+			System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
+			System.err.println("Erreur: " + e.getMessage());
 		}
-
-		return stub;
+	}
+	
+	public int remainingCapacity() {
+		return tasks.remainingCapacity();
+	}
+	
+	// ask task to queue
+	public boolean queueTask(OperationTodo operation) {
+		return tasks.add(operation);
+	}
+	
+	public int calculate() {
+		while (!tasks.isEmpty()) {
+			OperationTodo todo = tasks.poll();
+		}
+		return 0;
 	}
 
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
-	public int remainingCapacity(){
-		return tasks.remainingCapacity();
-	}
-	//ask task to queue
-	public boolean queueTask(OperationTodo operation){
-		return tasks.add(operation);
-	}
 
-	public int calculate(){
-		while(!tasks.isEmpty()){
-			OperationTodo todo = tasks.poll();
-		}
-		return 0;
+	public int calculateOperations(OperationTodo operation) throws RemoteException{
+		return operation.execute();
 	}
 }

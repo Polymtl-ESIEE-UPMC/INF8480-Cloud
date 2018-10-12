@@ -16,6 +16,7 @@ import java.util.Scanner;
 
 import shared.Account;
 import shared.AuthServerInterface;
+import shared.InterfaceLoader;
 import shared.RepartiteurInterface;
 
 public class Client {
@@ -79,57 +80,23 @@ public class Client {
 
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantServerHostname != null) {
-			authServer = loadAuthServer(distantServerHostname);
+			authServer = InterfaceLoader.loadAuthServer(distantServerHostname);
 		} else {
-			authServer = loadAuthServer("127.0.0.1");
+			authServer = InterfaceLoader.loadAuthServer("127.0.0.1");
 		}
 
 		if (authServer != null) {
 			try {
 				String repartiteurIp = authServer.getRepartiteurIp();
 				System.out.println(repartiteurIp);
-				repartiteur = loadRepartiteur(repartiteurIp);
+				repartiteur = InterfaceLoader.loadRepartiteur(repartiteurIp);
 			} catch (Exception e) {
 				System.out.println(e.getMessage());
 			}
 		}
 	}
 
-	// Récupère le stub du serveur d'authentification
-	private AuthServerInterface loadAuthServer(String hostname) {
-		AuthServerInterface stub = null;
 
-		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
-			stub = (AuthServerInterface) registry.lookup("authServer");
-		} catch (NotBoundException e) {
-			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
-		} catch (AccessException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		} catch (RemoteException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		}
-
-		return stub;
-	}
-
-	// Récupère le stub du serveur d'authentification
-	private RepartiteurInterface loadRepartiteur(String hostname) {
-		RepartiteurInterface stub = null;
-
-		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
-			stub = (RepartiteurInterface) registry.lookup("repartiteur");
-		} catch (NotBoundException e) {
-			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
-		} catch (AccessException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		} catch (RemoteException e) {
-			System.out.println("Erreur: " + e.getMessage());
-		}
-
-		return stub;
-	}
 
 	private void run(String filePath) {
 		if (repartiteur != null && authServer != null) {

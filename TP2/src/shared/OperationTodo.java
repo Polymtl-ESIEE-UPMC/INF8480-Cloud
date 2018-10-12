@@ -1,6 +1,8 @@
 package shared;
 
-public class OperationTodo {
+import java.io.Serializable;
+
+public class OperationTodo implements Serializable{
     public String name;
     public int parameter;
 
