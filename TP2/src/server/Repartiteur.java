@@ -84,6 +84,16 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 
 		try {
+			boolean success = authServer.loginRepartiteur(account);
+			if (!success) {
+				System.err.println("Erreur lors du login du répartiteur :");
+				return;
+			}
+		} catch (RemoteException e) {
+			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
+		}
+
+		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd.ip);
 				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip));
@@ -164,8 +174,8 @@ public class Repartiteur implements RepartiteurInterface {
 		// TODO: Faire un bon algorithme
 		int result = 0;
 		for (int i = 0; i < list.size(); i++) {
-			List<OperationTodo> wtf = new ArrayList<OperationTodo>(list.subList(i, i+1));
-			result = (result + calculationServers.get(0).calculateOperations(wtf)) % 4000;
+			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i+1));
+			result = (result + calculationServers.get(0).calculateOperations(task)) % 4000;
 		}
 		return result;
 	}

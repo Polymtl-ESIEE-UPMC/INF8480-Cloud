@@ -85,18 +85,23 @@ public class AuthServer implements AuthServerInterface {
 
 	@Override
 	public boolean newRepartiteur(Account account) throws RemoteException {
-		try {
-			repartiteurIp = RemoteServer.getClientHost();
-		} catch (ServerNotActiveException e) {
-			System.err.println("Could not get the Repartiteur ip adress.");
-			return false;
+		return newAuth(account, REPARTITEURS_DIR_NAME);
+	}
+
+	@Override
+	public boolean loginRepartiteur(Account account) throws RemoteException {
+		boolean valid = verifyRepartiteur(account);
+		if(valid){
+			try {
+				repartiteurIp = RemoteServer.getClientHost();
+				System.out.println("Repartiteur logged in at : " + repartiteurIp);
+				return true;
+			} catch (ServerNotActiveException e) {
+				System.err.println("Could not get the Repartiteur ip adress.");
+				return false;
+			}
 		}
 
-		if (newAuth(account, REPARTITEURS_DIR_NAME)) {
-			System.out.println("Repartiteur registered at : " + repartiteurIp);
-			return true;
-		}
-		
 		return false;
 	}
 
