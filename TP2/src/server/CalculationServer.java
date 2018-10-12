@@ -7,6 +7,8 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import shared.AuthServerInterface;
@@ -60,6 +62,7 @@ public class CalculationServer implements CalculationServerInterface {
 	private int badPercent;
 	private AuthServerInterface authServer;
 	private LinkedBlockingQueue<OperationTodo> tasks; // list of operations todo
+	private Random random;
 
 	public CalculationServer(String distantHostname, int capacity, int badPercent) {
 		super();
@@ -71,6 +74,7 @@ public class CalculationServer implements CalculationServerInterface {
 		this.capacity = capacity;
 		this.badPercent = badPercent;
 		tasks = new LinkedBlockingQueue<OperationTodo>(capacity);
+		random = new Random();
 
 		// Récupère le stub selon l'adresse passée en paramètre (localhost par déf
 		// ut)
@@ -112,16 +116,16 @@ public class CalculationServer implements CalculationServerInterface {
 			System.err.println("Erreur: " + e.getMessage());
 		}
 	}
-	
+
 	public int remainingCapacity() {
 		return tasks.remainingCapacity();
 	}
-	
+
 	// ask task to queue
 	public boolean queueTask(OperationTodo operation) {
 		return tasks.add(operation);
 	}
-	
+
 	public int calculate() {
 		while (!tasks.isEmpty()) {
 			OperationTodo todo = tasks.poll();
@@ -129,11 +133,38 @@ public class CalculationServer implements CalculationServerInterface {
 		return 0;
 	}
 
+	public boolean acceptTask(int opCount) {
+		if (opCount < capacity) {
+			return true;
+		}
+
+		double percent = (opCount - capacity) / (4.0 * capacity);
+		float randF = random.nextFloat();
+		return percent > randF;
+	}
+
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
 
-	public int calculateOperations(OperationTodo operation) throws RemoteException{
-		return operation.execute();
+	public int calculateOperations(List<OperationTodo> operations) throws RemoteException {
+		if(!acceptTask(operations.size())){
+			//opération refusée
+			return -1;
+		}
+
+		float randF = random.nextFloat();
+
+		if(badPercent > randF){
+			//retourner une valeur malicieuse
+			return random.nextInt(4000);
+		}
+
+		int result = 0;
+		for (OperationTodo op : operations) {
+			result = (result + op.execute()) % 4000;
+		}
+
+		return result;
 	}
 }

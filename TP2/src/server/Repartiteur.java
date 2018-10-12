@@ -29,10 +29,11 @@ import java.util.Scanner;
 
 public class Repartiteur implements RepartiteurInterface {
 
-	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur"; 
+	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur";
+
 	public static void main(String[] args) {
 		String authServerHostName = null;
-		if(args.length > 0){
+		if (args.length > 0) {
 			authServerHostName = args[0];
 		}
 		Repartiteur server = new Repartiteur(authServerHostName);
@@ -44,7 +45,7 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
-	
+
 	public Repartiteur(String authServerHostName) {
 		super();
 		if (System.getSecurityManager() == null) {
@@ -62,15 +63,13 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private void run() {
 		try {
-			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject
-					.exportObject(this, 0);
+			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
 			Registry registry = LocateRegistry.getRegistry();
 
 			registry.rebind("repartiteur", stub);
 			System.out.println("Repartiteur ready.");
 		} catch (ConnectException e) {
-			System.err
-					.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
+			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
 		} catch (Exception e) {
@@ -121,7 +120,7 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
-	private void createRepartiteur(){
+	private void createRepartiteur() {
 		Scanner reader = new Scanner(System.in);
 		try {
 			// Demande au serveur d'authentification de créer le compte
@@ -146,27 +145,28 @@ public class Repartiteur implements RepartiteurInterface {
 			reader.close();
 			return;
 		}
-	
+
 		reader.close();
 	}
-	
+
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
 
 	@Override
-	public int handleOperations(List<String> operations) throws RemoteException{
-		//TODO: Faire un bon algorithme
+	public int handleOperations(List<String> operations) throws RemoteException {
 		List<OperationTodo> list = new ArrayList<>();
-		for(String op : operations){
+		for (String op : operations) {
 			String[] algo = op.split(" ");
 			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
 		}
-
+		
+		// TODO: Faire un bon algorithme
 		int result = 0;
-		for(OperationTodo op : list){
-			result = (result + calculationServers.get(0).calculateOperations(op)) % 4000;
+		for (int i = 0; i < list.size(); i++) {
+			List<OperationTodo> wtf = new ArrayList<OperationTodo>(list.subList(i, i+1));
+			result = (result + calculationServers.get(0).calculateOperations(wtf)) % 4000;
 		}
 		return result;
-	}	
+	}
 }
