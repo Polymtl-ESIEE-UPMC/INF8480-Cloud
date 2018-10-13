@@ -118,10 +118,11 @@ public class Repartiteur implements RepartiteurInterface {
 		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd);
-				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip, sd.port));
+				CalculationServerInterface cs = InterfaceLoader.loadCalculationServer(sd.ip, sd.port);
+				calculationServers.add(cs);
 				
 				cacheCapacity.put(cs, sd.capacity);
-				int lastCScapacity = calculationServers.get(calculationServers.size()-1).getCapacity();
+				int lastCScapacity = sd.capacity;
 				totalCapacity += lastCScapacity;
 				if(numberOfServerWithGivenCapacity.get(lastCScapacity) == null){
 					numberOfServerWithGivenCapacity.put(lastCScapacity, 1);
@@ -246,7 +247,7 @@ public class Repartiteur implements RepartiteurInterface {
 					lonelyServers.add(idle);
 				}
 				while(lonelyServers.size() > 0){
-					int capacityToUndo = lonelyServers.get(0).getCapacity();
+					int capacityToUndo = getCapacity(lonelyServers.get(0));
 					numberOfServerWithGivenCapacity.put(capacityToUndo, numberOfServerWithGivenCapacity.get(capacityToUndo)+1);
 					calculationServers.add(lonelyServers.get(0));
 					lonelyServers.remove(0);
@@ -406,15 +407,11 @@ public class Repartiteur implements RepartiteurInterface {
 				totalCapacity -= capacityToRemove;
 				
 				for(CalculationServerInterface cs:calculationServers){
-					try {
-						if(cs.getCapacity() == capacityToRemove){
-							lonelyServers.add(cs);
-							calculationServers.remove(cs);
-							break;
-						}						
-					} catch (RemoteException e) {
-						//TODO: enlever getCapacity()
-					}
+					if(getCapacity(cs) == capacityToRemove){
+						lonelyServers.add(cs);
+						calculationServers.remove(cs);
+						break;
+					}						
 				}
 
 				numberOfServerWithGivenCapacity.put(capacityToRemove, entry.getValue()-1);
@@ -427,9 +424,14 @@ public class Repartiteur implements RepartiteurInterface {
 	private int getCapacity(CalculationServerInterface cs){
 		Integer capacity = cacheCapacity.get(cs);
 		if(capacity != null){
-			return serverInfo.capacity;
+			return capacity;
 		}else{
-			int temp = cs.getCapacity();
+			int temp = 0;
+			try{
+				temp = cs.getCapacity();
+			}catch (RemoteException e){
+				e.printStackTrace();
+			}
 			cacheCapacity.put(cs, temp);
 			return temp;
 		}
