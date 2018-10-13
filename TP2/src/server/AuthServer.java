@@ -174,6 +174,8 @@ public class AuthServer implements AuthServerInterface {
 		try {
 			String clientIp = RemoteServer.getClientHost();
 			serverDescription.ip = clientIp;
+			System.out.println("CalculationServer with capacity " + serverDescription.capacity + " registered at : "
+					+ clientIp + " port " + serverDescription.port);
 		} catch (ServerNotActiveException e) {
 			System.err.println("Could not get the Repartiteur ip adress.");
 			return false;
