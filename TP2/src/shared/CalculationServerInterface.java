@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface CalculationServerInterface extends Remote {
     public int calculateOperations(List<OperationTodo> operation) throws RemoteException;
+    public int getCapacity();
 }

@@ -53,7 +53,7 @@ public class CalculationServer implements CalculationServerInterface {
 	}
 
 	// Affiche l'aide sur les commandes
-	public static void printHelp() {
+	private static void printHelp() {
 		System.out.println("Liste des commandes :\n" + "-i ip_adress\n-m %malicieux\n-c capacité");
 	}
 
@@ -114,14 +114,14 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 	}
 
-	public boolean acceptTask(int opCount) {
+	private boolean acceptTask(int opCount) {
 		if (opCount < capacity) {
 			return true;
 		}
 
 		double percent = (opCount - capacity) / (4.0 * capacity);
 		float randF = random.nextFloat();
-		return percent > randF;
+		return percent < randF;
 	}
 
 	/*
@@ -147,5 +147,9 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 
 		return result;
+	}
+
+	public int getCapacity(){
+		return this.capacity;
 	}
 }

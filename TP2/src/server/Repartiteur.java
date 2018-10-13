@@ -23,8 +23,14 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Scanner;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -47,8 +53,13 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
+
+	private TreeMap<Integer, Integer> numberOfServerWithGivenCapacity = null;
+	private int totalCapacity = 0;
+	private Map<Integer, Integer> overheads;
+	private Map<Integer, Integer> dangerousOverheads;
+	private ExecutorService executorService = null;
 	private List<Future<Integer>> resultList = null;
-	ExecutorService executorService = null;
 
 	public Repartiteur(String authServerHostName) {
 		super();
@@ -66,6 +77,10 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void run() {
+		numberOfServerWithGivenCapacity = new TreeMap<>();
+		overheads = new HashMap<>();
+		dangerousOverheads = new HashMap<>();
+
 		try {
 			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
 			Registry registry = LocateRegistry.getRegistry();
@@ -101,10 +116,21 @@ public class Repartiteur implements RepartiteurInterface {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd.ip);
 				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip));
+				
+				int lastCScapacity = calculationServers.get(calculationServers.size()-1).getCapacity();
+				totalCapacity += lastCScapacity;
+				if(numberOfServerWithGivenCapacity.get(lastCScapacity) == null){
+					numberOfServerWithGivenCapacity.put(lastCScapacity, 1);
+				}else{
+					numberOfServerWithGivenCapacity.put(lastCScapacity, numberOfServerWithGivenCapacity.get(lastCScapacity)+1);
+				}
+				overheads.put(lastCScapacity, 0);
+				dangerousOverheads.put(lastCScapacity, 0);
 			}
 		} catch (RemoteException e) {
 			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
+		
 		//creer ThreadPool size = nombre de CalculationServer
 		executorService = Executors.newFixedThreadPool(calculationServers.size());
 		resultList = new ArrayList<>();
@@ -201,19 +227,29 @@ public class Repartiteur implements RepartiteurInterface {
 				List<Future<Integer>> secondResultList = new ArrayList<>();
 				break;
 			case "non-securise":
-				int needMachine = 0; //WORKING ON
-				for(OperationTodo op:list){
-					executorService.submit(()->{ //lambda Java 8 feature
+				
+				if(list.size() > totalCapacity){
+					double averageRefusePercent = (list.size() - totalCapacity)/(4*totalCapacity);
+					calculateOverheadForEach(averageRefusePercent);
+				}
+
+				int from = 0;
+				for(CalculationServerInterface cs:calculationServers){
+					int csCapacity = cs.getCapacity();
+					int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheads.get(csCapacity);
+					int final_from = from;
+					resultList.add(executorService.submit(()->{ //lambda Java 8 feature
 						int result = 0;
-						int i = 0;
 						do{
 							try{
-								calculationServers.get(i).calculateOperations(list);
+								result = cs.calculateOperations(list.subList(final_from, to));
 							}catch(RemoteException e){
 								e.printStackTrace();
 							}
 						}while(result == -1);
-					});
+						return result;
+					}));
+					from = to;
 				}
 				break;
 			default:
@@ -221,10 +257,41 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 		
 		int result = 0;
-		for (int i = 0; i < list.size(); i++) {
-			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i+1));
-			result = (result + calculationServers.get(0).calculateOperations(task)) % 4000;
+		for (int i = 0; i < resultList.size(); i++) {
+			try{
+				result = (result + resultList.get(i).get()) % 4000;
+			}catch(ExecutionException e){
+				e.printStackTrace();
+			}catch(InterruptedException e){
+				e.printStackTrace();
+			}
 		}
 		return result;
+	}
+
+	private void calculateOverheadForEach(double averageRefusePercent){
+		double dangerousOverhead = 0.0;
+
+		for(Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()){
+			double overhead = 0.0;
+			overhead = averageRefusePercent * 4 * entry.getKey();
+			overheads.put(entry.getKey(), (int) Math.floor(overhead));
+			double currentDangerousOverhead = (overhead - Math.floor(overhead))*entry.getValue();
+			dangerousOverhead += currentDangerousOverhead ;
+		}
+
+		dangerousOverhead = Math.ceil(dangerousOverhead);
+		NavigableMap reverse = numberOfServerWithGivenCapacity.descendingMap();
+		Iterator<Map.Entry<Integer, Integer>> it = reverse.entrySet().iterator();
+		while (it.hasNext() && dangerousOverhead > 0) {
+			Map.Entry<Integer, Integer> entry = it.next();
+			int numberOfServerWithCurrentCapacity = entry.getValue();
+			if(dangerousOverhead > numberOfServerWithCurrentCapacity){
+				dangerousOverheads.put(entry.getKey(), numberOfServerWithCurrentCapacity);
+				dangerousOverhead -= numberOfServerWithCurrentCapacity;
+			}else{
+				dangerousOverheads.put(entry.getKey(), (int) dangerousOverhead);
+			}
+		}
 	}
 }
