@@ -114,8 +114,8 @@ public class Repartiteur implements RepartiteurInterface {
 
 		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
-				System.out.println(sd.ip);
-				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip));
+				System.out.println(sd);
+				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip, sd.port));
 				
 				int lastCScapacity = calculationServers.get(calculationServers.size()-1).getCapacity();
 				totalCapacity += lastCScapacity;
@@ -177,7 +177,6 @@ public class Repartiteur implements RepartiteurInterface {
 					System.out.println("Création du répartiteur réussie!");
 				} catch (FileNotFoundException e) {
 					System.err.println("Problème lors de la création du fichier d'informations de compte.");
-					return;
 				}
 			} else {
 				System.out.println("Ce nom d'utilisateur n'est pas disponible, veuillez recommencer.");
@@ -185,8 +184,6 @@ public class Repartiteur implements RepartiteurInterface {
 		} catch (RemoteException err) {
 			System.err.println(
 					"Erreur liée à la connexion au serveur. Abandon de la tentative de création de compte répartiteur.");
-			reader.close();
-			return;
 		}
 
 		reader.close();
@@ -208,7 +205,7 @@ public class Repartiteur implements RepartiteurInterface {
 		int result = 0;
 		for (int i = 0; i < list.size(); i++) {
 			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i+1));
-			result = (result + calculationServers.get(0).calculateOperations(task)) % 4000;
+			result = (result + calculationServers.get(i%2).calculateOperations(task)) % 4000;
 		}
 		return result;
 	}
@@ -328,10 +325,14 @@ public class Repartiteur implements RepartiteurInterface {
 				totalCapacity -= entry.getKey();
 				
 				for(CalculationServerInterface cs:calculationServers){
-					if(cs.getCapacity() == entry.getKey()){
-						lonelyServers.add(cs);
-						calculationServers.remove(cs);
-						break;
+					try {
+						if(cs.getCapacity() == entry.getKey()){
+							lonelyServers.add(cs);
+							calculationServers.remove(cs);
+							break;
+						}						
+					} catch (RemoteException e) {
+						//TODO: enlever getCapacity()
 					}
 				}
 

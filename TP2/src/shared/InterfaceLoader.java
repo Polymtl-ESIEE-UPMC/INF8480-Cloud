@@ -6,9 +6,9 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-public class InterfaceLoader{
+public class InterfaceLoader {
 
-    // Récupère le stub du serveur d'authentification
+	// Récupère le stub du serveur d'authentification
 	public static AuthServerInterface loadAuthServer(String hostname) {
 		AuthServerInterface stub = null;
 
@@ -24,9 +24,9 @@ public class InterfaceLoader{
 		}
 
 		return stub;
-    }
-    
-    // Récupère le stub du serveur d'authentification
+	}
+
+	// Récupère le stub du serveur d'authentification
 	public static RepartiteurInterface loadRepartiteur(String hostname) {
 		RepartiteurInterface stub = null;
 
@@ -42,15 +42,20 @@ public class InterfaceLoader{
 		}
 
 		return stub;
-    }
-    
-    // Récupère le stub du serveur de calcul
-	public static CalculationServerInterface loadCalculationServer(String hostname) {
+	}
+
+	// Récupère le stub du serveur de calcul
+	public static CalculationServerInterface loadCalculationServer(String hostname, int port) {
 		CalculationServerInterface stub = null;
 
 		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
-			stub = (CalculationServerInterface) registry.lookup("calculationServer");
+			if (port != 0) {
+				Registry registry = LocateRegistry.getRegistry(hostname, port);
+				stub = (CalculationServerInterface) registry.lookup("calculationServer");
+			} else {
+				Registry registry = LocateRegistry.getRegistry(hostname);
+				stub = (CalculationServerInterface) registry.lookup("calculationServer");
+			}
 		} catch (NotBoundException e) {
 			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
 		} catch (AccessException e) {
@@ -60,5 +65,5 @@ public class InterfaceLoader{
 		}
 
 		return stub;
-    }
+	}
 }
