@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -224,27 +225,38 @@ public class Repartiteur implements RepartiteurInterface {
 
 		switch(mode){
 			case "securise":
-				List<CalculationServerInterface> lonelyServers = detectLonelyServers();
+				List<CalculationServerInterface> lonelyServers = detectLonelyServers(); //servers sans partenaire avec la meme capacite
 				CalculationServerInterface idle = null;
 				if(calculationServers.size() %2 !=0){
 					idle = lonelyServers.get(0);
 					lonelyServers.remove(0);
 				}
 				
+				Map<Integer, Integer> mapping = new HashMap<>();
+				if(lonelyServers.size() == 0){
+					calculateOverheadForEach(list.size(), 2);
+				}else{
+					calculateOverheadForEach(list.size(), 2, lonelyServers, mapping);
+				}
+
 				List<Future<Integer>> secondResultList = new ArrayList<>();
 				
 				//undo modification
 				if(idle != null){
-					numberOfServerWithGivenCapacity.put(idle.getCapacity(), numberOfServerWithGivenCapacity.get(idle.getCapacity())+1);
-					calculationServers.add(idle);
-					totalCapacity += idle.getCapacity();
+					lonelyServers.add(idle);
+				}
+				while(lonelyServers.size() > 0){
+					int capacityToUndo = lonelyServers.get(0).getCapacity();
+					numberOfServerWithGivenCapacity.put(capacityToUndo, numberOfServerWithGivenCapacity.get(capacityToUndo)+1);
+					calculationServers.add(lonelyServers.get(0));
+					lonelyServers.remove(0);
+					totalCapacity += capacityToUndo;
 				}
 				break;
 			
 			case "non-securise":
 				if(list.size() > totalCapacity){
-					double averageRefusePercent = (list.size() - totalCapacity)/(4*totalCapacity);
-					calculateOverheadForEach(averageRefusePercent);
+					calculateOverheadForEach(list.size());
 				}
 
 				int from = 0;
@@ -293,7 +305,9 @@ public class Repartiteur implements RepartiteurInterface {
 		return result;
 	}
 
-	private void calculateOverheadForEach(double averageRefusePercent){
+	// NON-SECURISE MODE
+	private void calculateOverheadForEach(int operationsSize){
+		double averageRefusePercent = (operationsSize - totalCapacity)/(4*totalCapacity);
 		double dangerousOverhead = 0.0;
 
 		for(Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()){
@@ -320,22 +334,86 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
+	// SECURISE MODE SANS LONELY SERVERS
+	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor){
+		int halfTotalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
+		double averageRefusePercent = (operationsSize - halfTotalCapacity)/(4*halfTotalCapacity);
+		double dangerousOverhead = 0.0;
+
+		for(Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()){
+			double overhead = 0.0;
+			overhead = averageRefusePercent * 4 * entry.getKey();
+			overheads.put(entry.getKey(), (int) Math.floor(overhead));
+			double currentDangerousOverhead = (overhead - Math.floor(overhead))*entry.getValue() / multipleCheckFactor;
+			dangerousOverhead += currentDangerousOverhead ;
+		}
+
+		dangerousOverhead = Math.ceil(dangerousOverhead);
+		NavigableMap reverse = numberOfServerWithGivenCapacity.descendingMap();
+		Iterator<Map.Entry<Integer, Integer>> it = reverse.entrySet().iterator();
+		
+		while (it.hasNext() && dangerousOverhead > 0) {
+			Map.Entry<Integer, Integer> entry = it.next();
+			int numberOfServerWithCurrentCapacity = entry.getValue() / multipleCheckFactor;
+			if(dangerousOverhead > numberOfServerWithCurrentCapacity){
+				dangerousOverheads.put(entry.getKey(), numberOfServerWithCurrentCapacity);
+				dangerousOverhead -= numberOfServerWithCurrentCapacity;
+			}else{
+				dangerousOverheads.put(entry.getKey(), (int) dangerousOverhead);
+			}
+		}
+	}
+
+	// SECURISE MODE AVEC LONELY SERVERS
+	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor, List<CalculationServerInterface> lonelyServers, 
+																						Map<Integer, Integer> mapping){
+
+		Collections.sort(lonelyServers);
+		int halfTotalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
+		double averageRefusePercent = (operationsSize - halfTotalCapacity)/(4*halfTotalCapacity);
+		double dangerousOverhead = 0.0;
+
+		for(Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()){
+			double overhead = 0.0;
+			overhead = averageRefusePercent * 4 * entry.getKey();
+			overheads.put(entry.getKey(), (int) Math.floor(overhead));
+			double currentDangerousOverhead = (overhead - Math.floor(overhead))*entry.getValue() / multipleCheckFactor;
+			dangerousOverhead += currentDangerousOverhead ;
+		}
+
+		dangerousOverhead = Math.ceil(dangerousOverhead);
+		NavigableMap reverse = numberOfServerWithGivenCapacity.descendingMap();
+		Iterator<Map.Entry<Integer, Integer>> it = reverse.entrySet().iterator();
+		
+		while (it.hasNext() && dangerousOverhead > 0) {
+			Map.Entry<Integer, Integer> entry = it.next();
+			int numberOfServerWithCurrentCapacity = entry.getValue() / multipleCheckFactor;
+			if(dangerousOverhead > numberOfServerWithCurrentCapacity){
+				dangerousOverheads.put(entry.getKey(), numberOfServerWithCurrentCapacity);
+				dangerousOverhead -= numberOfServerWithCurrentCapacity;
+			}else{
+				dangerousOverheads.put(entry.getKey(), (int) dangerousOverhead);
+			}
+		}
+	}
+
 	private List<CalculationServerInterface> detectLonelyServers(){
 		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
 			
 		for(Map.Entry<Integer, Integer> entry:numberOfServerWithGivenCapacity.entrySet()){
 			if(entry.getValue()%2 != 0){
-				totalCapacity -= entry.getKey();
+				int capacityToRemove = entry.getKey();
+				totalCapacity -= capacityToRemove;
 				
 				for(CalculationServerInterface cs:calculationServers){
-					if(cs.getCapacity() == entry.getKey()){
+					if(cs.getCapacity() == capacityToRemove){
 						lonelyServers.add(cs);
 						calculationServers.remove(cs);
 						break;
 					}
 				}
 
-				numberOfServerWithGivenCapacity.put(entry.getKey(), entry.getValue()-1);
+				numberOfServerWithGivenCapacity.put(capacityToRemove, entry.getValue()-1);
 			}
 		}
 
