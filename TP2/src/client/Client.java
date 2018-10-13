@@ -88,7 +88,7 @@ public class Client {
 		if (authServer != null) {
 			try {
 				String repartiteurIp = authServer.getRepartiteurIp();
-				System.out.println(repartiteurIp);
+				System.out.println("Repartiteur Ip : " + repartiteurIp);
 				repartiteur = InterfaceLoader.loadRepartiteur(repartiteurIp);
 			} catch (Exception e) {
 				System.out.println(e.getMessage());
