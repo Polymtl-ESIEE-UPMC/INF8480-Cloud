@@ -23,6 +23,7 @@ public class CalculationServer implements CalculationServerInterface {
 		String distantHostname = null;
 		int capacity = DEFAULT_CAPACITY;
 		int badPercent = 0;
+		int port = 0;
 		if (args.length > 0) {
 			// analyse les arguments envoyés au programme
 			for (int i = 0; i < args.length; i++) {
@@ -37,44 +38,48 @@ public class CalculationServer implements CalculationServerInterface {
 					case "-m":
 						badPercent = Integer.parseInt(args[++i]);
 						break;
+					case "-p":
+						port = Integer.parseInt(args[++i]);
+						break;
 					default:
 						System.err.println("Mauvaise commande : " + args[i]);
 						return;
 					}
-				} catch (IndexOutOfBoundsException e) {
-					e.printStackTrace();
+				} catch (IndexOutOfBoundsException | NumberFormatException e) {
+					printHelp();
 					return;
 				}
 			}
 		}
 
-		CalculationServer server = new CalculationServer(distantHostname, capacity, badPercent);
+		CalculationServer server = new CalculationServer(distantHostname, port, capacity, badPercent);
 		server.run();
 	}
 
 	// Affiche l'aide sur les commandes
 	private static void printHelp() {
-		System.out.println("Liste des commandes :\n" + "-i ip_adress\n-m %malicieux\n-c capacité");
+		System.out.println("Liste des commandes :\n" + "-i ip_adress\n-m %malicieux\n-c capacité\n-p port");
 	}
 
 	private int capacity;
 	private int badPercent;
+	private int port;
 	private AuthServerInterface authServer;
 	private Random random;
 
-	public CalculationServer(String distantHostname, int capacity, int badPercent) {
+	public CalculationServer(String distantHostname, int port, int capacity, int badPercent) {
 		super();
 
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
 		}
 
+		this.port = port;
 		this.capacity = capacity;
 		this.badPercent = badPercent;
 		random = new Random();
 
-		// Récupère le stub selon l'adresse passée en paramètre (localhost par déf
-		// ut)
+		// Récupère le stub selon l'adresse passée en paramètre (localhost par défaut)
 		if (distantHostname != null) {
 			authServer = InterfaceLoader.loadAuthServer(distantHostname);
 		} else {
@@ -94,9 +99,16 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 
 		try {
-			CalculationServerInterface stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, 0);
+			CalculationServerInterface stub; 
+			Registry registry;
+			if(port == 0){
+				stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, 0);
+				registry = LocateRegistry.getRegistry();
+			} else{
+				stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, this.port);
+				registry = LocateRegistry.createRegistry(this.port);
+			}
 
-			Registry registry = LocateRegistry.getRegistry();
 			registry.rebind("calculationServer", stub);
 			System.out.println("Calculation server ready.");
 		} catch (ConnectException e) {
@@ -107,7 +119,7 @@ public class CalculationServer implements CalculationServerInterface {
 			System.err.println("Erreur: " + e.getMessage());
 		}
 
-		CalculationServerInfo info = new CalculationServerInfo("", 0, capacity);
+		CalculationServerInfo info = new CalculationServerInfo("", this.port, capacity);
 		try {
 			boolean success = authServer.registerCalculationServer(info);
 			if (!success) {
@@ -132,13 +144,15 @@ public class CalculationServer implements CalculationServerInterface {
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
-
+	
+	@Override
 	public int calculateOperations(List<OperationTodo> operations) throws RemoteException {
 		if(!acceptTask(operations.size())){
 			//opération refusée
 			return -1;
 		}
 
+		System.out.println("Handling " + operations.size() + " operations.");
 		float randF = random.nextFloat();
 
 		if(badPercent > randF){
@@ -154,7 +168,8 @@ public class CalculationServer implements CalculationServerInterface {
 		return result;
 	}
 
-	public int getCapacity(){
+	@Override
+	public int getCapacity() throws RemoteException{
 		return this.capacity;
 	}
 }

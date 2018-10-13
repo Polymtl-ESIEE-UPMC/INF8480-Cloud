@@ -12,4 +12,9 @@ public class CalculationServerInfo implements Serializable{
         this.port = port;
         this.capacity = capacity;
     }
+
+    @Override
+    public String toString(){
+        return ip + ":"+ port + " et capacity : " + capacity;
+    }
 } 
