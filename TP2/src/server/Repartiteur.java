@@ -224,22 +224,44 @@ public class Repartiteur implements RepartiteurInterface {
 
 		switch(mode){
 			case "securise":
-				List<Future<Integer>> secondResultList = new ArrayList<>();
-				break;
-			case "non-securise":
+				List<CalculationServerInterface> lonelyServers = detectLonelyServers();
+				CalculationServerInterface idle = null;
+				if(calculationServers.size() %2 !=0){
+					idle = lonelyServers.get(0);
+					lonelyServers.remove(0);
+				}
 				
+				List<Future<Integer>> secondResultList = new ArrayList<>();
+				
+				//undo modification
+				if(idle != null){
+					numberOfServerWithGivenCapacity.put(idle.getCapacity(), numberOfServerWithGivenCapacity.get(idle.getCapacity())+1);
+					calculationServers.add(idle);
+					totalCapacity += idle.getCapacity();
+				}
+				break;
+			
+			case "non-securise":
 				if(list.size() > totalCapacity){
 					double averageRefusePercent = (list.size() - totalCapacity)/(4*totalCapacity);
 					calculateOverheadForEach(averageRefusePercent);
 				}
 
 				int from = 0;
+				
 				for(CalculationServerInterface cs:calculationServers){
 					int csCapacity = cs.getCapacity();
-					int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheads.get(csCapacity);
+					int dangerousOverheadTaken = 0;
+					if(dangerousOverheads.get(csCapacity) > 0){
+						dangerousOverheadTaken = 1;
+						dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
+					}
+					int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
 					int final_from = from;
+					
 					resultList.add(executorService.submit(()->{ //lambda Java 8 feature
 						int result = 0;
+						
 						do{
 							try{
 								result = cs.calculateOperations(list.subList(final_from, to));
@@ -247,11 +269,13 @@ public class Repartiteur implements RepartiteurInterface {
 								e.printStackTrace();
 							}
 						}while(result == -1);
+						
 						return result;
 					}));
 					from = to;
 				}
 				break;
+				
 			default:
 				throw new RemoteException("Erreur: mode non reconnu");
 		}
@@ -283,6 +307,7 @@ public class Repartiteur implements RepartiteurInterface {
 		dangerousOverhead = Math.ceil(dangerousOverhead);
 		NavigableMap reverse = numberOfServerWithGivenCapacity.descendingMap();
 		Iterator<Map.Entry<Integer, Integer>> it = reverse.entrySet().iterator();
+		
 		while (it.hasNext() && dangerousOverhead > 0) {
 			Map.Entry<Integer, Integer> entry = it.next();
 			int numberOfServerWithCurrentCapacity = entry.getValue();
@@ -293,5 +318,27 @@ public class Repartiteur implements RepartiteurInterface {
 				dangerousOverheads.put(entry.getKey(), (int) dangerousOverhead);
 			}
 		}
+	}
+
+	private List<CalculationServerInterface> detectLonelyServers(){
+		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
+			
+		for(Map.Entry<Integer, Integer> entry:numberOfServerWithGivenCapacity.entrySet()){
+			if(entry.getValue()%2 != 0){
+				totalCapacity -= entry.getKey();
+				
+				for(CalculationServerInterface cs:calculationServers){
+					if(cs.getCapacity() == entry.getKey()){
+						lonelyServers.add(cs);
+						calculationServers.remove(cs);
+						break;
+					}
+				}
+
+				numberOfServerWithGivenCapacity.put(entry.getKey(), entry.getValue()-1);
+			}
+		}
+
+		return lonelyServers;
 	}
 }
