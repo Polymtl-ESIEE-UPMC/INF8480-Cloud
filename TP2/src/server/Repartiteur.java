@@ -55,6 +55,7 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String password = "temppassword";
 	private Account account = null;
 
+	private Map<CalculationServerInterface, Integer> cacheCapacity = null;
 	private TreeMap<Integer, Integer> numberOfServerWithGivenCapacity = null;
 	private int totalCapacity = 0;
 	private Map<Integer, Integer> overheads;
@@ -81,6 +82,7 @@ public class Repartiteur implements RepartiteurInterface {
 		numberOfServerWithGivenCapacity = new TreeMap<>();
 		overheads = new HashMap<>();
 		dangerousOverheads = new HashMap<>();
+		cacheCapacity = new HashMap<>();
 
 		try {
 			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
@@ -116,8 +118,10 @@ public class Repartiteur implements RepartiteurInterface {
 		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd.ip);
-				calculationServers.add(InterfaceLoader.loadCalculationServer(sd.ip));
+				CalculationServerInterface cs = InterfaceLoader.loadCalculationServer(sd.ip);
+				calculationServers.add(cs);
 				
+				cacheCapacity.put(cs, sd.capacity);
 				int lastCScapacity = calculationServers.get(calculationServers.size()-1).getCapacity();
 				totalCapacity += lastCScapacity;
 				if(numberOfServerWithGivenCapacity.get(lastCScapacity) == null){
@@ -418,5 +422,16 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 
 		return lonelyServers;
+	}
+
+	private int getCapacity(CalculationServerInterface cs){
+		Integer capacity = cacheCapacity.get(cs);
+		if(capacity != null){
+			return serverInfo.capacity;
+		}else{
+			int temp = cs.getCapacity();
+			cacheCapacity.put(cs, temp);
+			return temp;
+		}
 	}
 }
