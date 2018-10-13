@@ -87,6 +87,11 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 	}
 
+	@Override
+	public int compareTo(CalculationServerInterface other) {
+		return Integer.compare(this.capacity, other.getCapacity());
+	}
+
 	// lance le serveur
 	private void run() {
 		if (authServer == null) {
