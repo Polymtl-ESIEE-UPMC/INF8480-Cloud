@@ -144,6 +144,7 @@ public class CalculationServer implements CalculationServerInterface {
 	public int calculateOperations(List<OperationTodo> operations) throws RemoteException {
 		if(!acceptTask(operations.size())){
 			//opération refusée
+			//System.out.println("refuse");
 			return -1;
 		}
 
