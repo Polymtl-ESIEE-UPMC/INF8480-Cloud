@@ -571,7 +571,8 @@ public class Repartiteur implements RepartiteurInterface {
 			
 			do{
 				try{
-					result = cs.calculateOperations(list.subList(from, to));
+					List<OperationTodo> sublist = new ArrayList<>(list.subList(from, to));
+					result = cs.calculateOperations(sublist);
 				}catch(RemoteException e){
 					e.printStackTrace();
 				}
@@ -588,7 +589,8 @@ public class Repartiteur implements RepartiteurInterface {
 			
 			do{
 				try{
-					result = cs.calculateOperations(list.subList(from, to));
+					List<OperationTodo> sublist = new ArrayList<>(list.subList(from, to));
+					result = cs.calculateOperations(sublist);
 				}catch(RemoteException e){
 					e.printStackTrace();
 				}
