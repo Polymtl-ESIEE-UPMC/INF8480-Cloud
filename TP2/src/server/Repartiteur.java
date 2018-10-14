@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -37,6 +38,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 public class Repartiteur implements RepartiteurInterface {
+
+	private class CalculationServerComparator implements Comparator<CalculationServerInterface> {
+		@Override
+		public int compare(CalculationServerInterface o1, CalculationServerInterface o2) {
+			return Integer.compare(getCapacity(o1), getCapacity(o2));
+		}
+	} 
 
 	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur";
 
@@ -351,7 +359,7 @@ public class Repartiteur implements RepartiteurInterface {
 	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor, 
 			List<CalculationServerInterface> lonelyServers, Map<Integer, Integer> mapping) throws Exception{
 
-		Collections.sort(lonelyServers);
+		Collections.sort(lonelyServers, new CalculationServerComparator());
 
 		if(lonelyServers.size() % multipleCheckFactor != 0){
 			throw new Exception("FATAL: le nombre de lonelyServer est incoherent");
@@ -505,7 +513,7 @@ public class Repartiteur implements RepartiteurInterface {
 														List<Future<Integer>> secondResultList){
 		int from = 0;
 		
-		Collections.sort(calculationServers);
+		Collections.sort(calculationServers, new CalculationServerComparator());
 
 		for(int i=0; i<calculationServers.size(); i=i+2){
 			CalculationServerInterface cs = calculationServers.get(i);
@@ -533,7 +541,7 @@ public class Repartiteur implements RepartiteurInterface {
 				List<Future<Integer>> secondResultList,
 				int from){
 		
-		Collections.sort(lonelyServers);
+		Collections.sort(lonelyServers, new CalculationServerComparator());
 
 		for(int i=0; i<lonelyServers.size(); i=i+2){
 			CalculationServerInterface cs = lonelyServers.get(i);
