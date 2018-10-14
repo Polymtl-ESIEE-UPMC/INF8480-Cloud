@@ -107,8 +107,13 @@ public class Client {
 					return;
 				}
 				List<String> operations = readAllText(filePath);
-				int reponse = repartiteur.handleOperations(operations);
-				System.out.println(reponse);
+				//int reponse = repartiteur.handleOperations(operations);
+				String mode = "non-securise";
+				Integer reponse = repartiteur.handleOperations(operations);
+				if(reponse == null){
+					System.out.println("Il y a des serverus malicieux, veuillez reessayer");	
+				}else
+					System.out.println(reponse);
 			} catch (RemoteException e) {
 				System.err.println("Erreur: " + e.getMessage());
 			}
