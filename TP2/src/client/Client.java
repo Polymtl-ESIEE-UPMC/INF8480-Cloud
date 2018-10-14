@@ -109,7 +109,7 @@ public class Client {
 				List<String> operations = readAllText(filePath);
 				//int reponse = repartiteur.handleOperations(operations);
 				String mode = "non-securise";
-				Integer reponse = repartiteur.handleOperations(operations);
+				Integer reponse = repartiteur.handleOperations(operations, mode);
 				if(reponse == null){
 					System.out.println("Il y a des serverus malicieux, veuillez reessayer");	
 				}else
