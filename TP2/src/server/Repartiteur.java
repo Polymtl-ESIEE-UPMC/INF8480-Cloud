@@ -256,16 +256,25 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void delegateHandleOperationNonSecurise(List<OperationTodo> list){
+
+
 		List<OperationTodo> remainingList = new ArrayList<>();
-		//TODO: TOTAL CAPCITY UPDATE
 
 		if (list.size() > totalCapacity) {
-			double averageRefusePercent = (list.size() - totalCapacity) / (4 * totalCapacity);
+			double averageRefusePercent = (double) (list.size() - totalCapacity) / (4 * totalCapacity);
 			while(averageRefusePercent > 0.5){
-				remainingList.add(list.get(list.size()-1));
-				averageRefusePercent = (list.size() - totalCapacity) / (4 * totalCapacity);
+				System.out.println("refuse rate "+averageRefusePercent);
+				System.out.println("Too much, reduce list size to "+(list.size()-1));
+				OperationTodo remain = list.get(list.size()-1);
+				remainingList.add(remain);
+				list.remove(remain);
+				averageRefusePercent = (double) (list.size() - totalCapacity) / (4 * totalCapacity);
 			}
+			System.out.println("refuse rate "+averageRefusePercent);	
 			calculateOverheadForEach(list.size());
+		}else{
+			overheads.clear();
+			dangerousOverheads.clear();
 		}
 		
 		assignTasks(list);
@@ -274,7 +283,9 @@ public class Repartiteur implements RepartiteurInterface {
 		Integer temp = getResult(CHECK_WITH_SECOND_SERVER);
 		if(temp != null){
 			result += temp;
+			System.out.println("current result "+result);
 			if(remainingList.size() > 0){
+				System.out.println("remaining size "+(remainingList.size()));
 				delegateHandleOperationNonSecurise(remainingList);
 			}
 		}else{
@@ -289,11 +300,13 @@ public class Repartiteur implements RepartiteurInterface {
 
 		//TODO: MAPPING EVEN WITHOUT OVERHEAD
 		if (list.size() > totalCapacity/REQUIRED_CHECK) {
-			double averageRefusePercent = (list.size() - totalCapacity/REQUIRED_CHECK) / 
+			double averageRefusePercent = (double) (list.size() - totalCapacity/REQUIRED_CHECK) / 
 															(4 * totalCapacity/REQUIRED_CHECK);
 			while(averageRefusePercent > 0.4){
-				remainingList.add(list.get(list.size()-1));
-				averageRefusePercent = (list.size() - totalCapacity/REQUIRED_CHECK) / 
+				OperationTodo remain = list.get(list.size()-1);
+				remainingList.add(remain);
+				list.remove(remain);
+				averageRefusePercent = (double) (list.size() - totalCapacity/REQUIRED_CHECK) / 
 															(4 * totalCapacity/REQUIRED_CHECK);
 			}
 		}
@@ -313,6 +326,9 @@ public class Repartiteur implements RepartiteurInterface {
 					e.printStackTrace();
 				}
 			}
+		}else{
+			overheads.clear();
+			dangerousOverheads.clear();
 		}
 
 		List<Future<Integer>> secondResultList = new ArrayList<>();
@@ -371,12 +387,16 @@ public class Repartiteur implements RepartiteurInterface {
 		for (CalculationServerInterface cs : calculationServers) {
 			int csCapacity = getCapacity(cs);
 			int dangerousOverheadTaken = 0;
-			if (dangerousOverheads.get(csCapacity) > 0) {
+			
+			if (dangerousOverheads.get(csCapacity) != null && dangerousOverheads.get(csCapacity) > 0) {
 				dangerousOverheadTaken = 1;
 				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
 			}
-
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
+			int overhead = 0;
+			if (overheads.get(csCapacity) != null) {
+				overhead = overheads.get(csCapacity);
+			}
+			int to = from + csCapacity + overhead + dangerousOverheadTaken;
 			int final_from = from;
 
 			sendTask(list, from, to, cs);
@@ -541,12 +561,12 @@ public class Repartiteur implements RepartiteurInterface {
 
 	// NON-SECURISE MODE
 	private void calculateOverheadForEach(int operationsSize) {
-		double averageRefusePercent = (operationsSize - totalCapacity) / (4 * totalCapacity);
+		double averageRefusePercent = (double) (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
-			overhead = averageRefusePercent * 4 * entry.getKey();
+			overhead = (double) averageRefusePercent * 4 * entry.getKey();
 			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue();
 			dangerousOverhead += currentDangerousOverhead;
 
@@ -560,12 +580,12 @@ public class Repartiteur implements RepartiteurInterface {
 	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor) {
 		totalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
 
-		double averageRefusePercent = (operationsSize - totalCapacity) / (4 * totalCapacity);
+		double averageRefusePercent = (double) (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
-			overhead = averageRefusePercent * 4 * entry.getKey();
+			overhead = (double) averageRefusePercent * 4 * entry.getKey();
 			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue()
 					/ multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
@@ -594,12 +614,12 @@ public class Repartiteur implements RepartiteurInterface {
 
 		totalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
 
-		double averageRefusePercent = (operationsSize - totalCapacity) / (4 * totalCapacity);
+		double averageRefusePercent = (double) (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
-			overhead = averageRefusePercent * 4 * entry.getKey();
+			overhead = (double) averageRefusePercent * 4 * entry.getKey();
 			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue() / multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
@@ -613,7 +633,7 @@ public class Repartiteur implements RepartiteurInterface {
 				mappedCapacity = entry.getKey();
 			}
 
-			overhead = averageRefusePercent * 4 * mappedCapacity;
+			overhead = (double) averageRefusePercent * 4 * mappedCapacity;
 			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue()/ multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
