@@ -397,7 +397,6 @@ public class Repartiteur implements RepartiteurInterface {
 				overhead = overheads.get(csCapacity);
 			}
 			int to = from + csCapacity + overhead + dangerousOverheadTaken;
-			int final_from = from;
 
 			sendTask(list, from, to, cs);
 			from = to;
@@ -423,8 +422,11 @@ public class Repartiteur implements RepartiteurInterface {
 				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
 			}
 
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
-			int final_from = from;
+			int overhead = 0;
+			if (overheads.get(csCapacity) != null) {
+				overhead = overheads.get(csCapacity);
+			}
+			int to = from + csCapacity + overhead + dangerousOverheadTaken;
 
 			sendTask(list, from, to, cs);
 
@@ -456,8 +458,11 @@ public class Repartiteur implements RepartiteurInterface {
 				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
 			}
 
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
-			int final_from = from;
+			int overhead = 0;
+			if (overheads.get(csCapacity) != null) {
+				overhead = overheads.get(csCapacity);
+			}
+			int to = from + csCapacity + overhead + dangerousOverheadTaken;
 
 			sendTask(list, from, to, cs);
 
@@ -567,7 +572,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
 			overhead = (double) averageRefusePercent * 4 * entry.getKey();
-			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue();
+			double currentDangerousOverhead = (double) (overhead - Math.floor(overhead)) * entry.getValue();
 			dangerousOverhead += currentDangerousOverhead;
 
 			overheads.put(entry.getKey(), (int) Math.floor(overhead));
@@ -586,7 +591,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
 			overhead = (double) averageRefusePercent * 4 * entry.getKey();
-			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue()
+			double currentDangerousOverhead = (double) (overhead - Math.floor(overhead)) * entry.getValue()
 					/ multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
@@ -620,7 +625,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
 			overhead = (double) averageRefusePercent * 4 * entry.getKey();
-			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue() / multipleCheckFactor;
+			double currentDangerousOverhead = (double) (overhead - Math.floor(overhead)) * entry.getValue() / multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
 			overheads.put(entry.getKey(), (int) Math.floor(overhead));
@@ -634,7 +639,7 @@ public class Repartiteur implements RepartiteurInterface {
 			}
 
 			overhead = (double) averageRefusePercent * 4 * mappedCapacity;
-			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue()/ multipleCheckFactor;
+			double currentDangerousOverhead = (double) (overhead - Math.floor(overhead)) * entry.getValue()/ multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
 			Integer currentValue = overheads.get(mappedCapacity);
@@ -658,9 +663,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		for (Map.Entry<Integer, Integer> entry : lonelyServersWithGivenCapacity.entrySet()) {
 			Integer currentValue = numberOfServerWithGivenCapacity.get(entry.getKey());
-			if (currentValue == null) {
-				concatenateMap.put(entry.getKey(), entry.getValue());
-			} else {
+			{
 				concatenateMap.put(entry.getKey(), currentValue + entry.getValue());
 			}
 		}
