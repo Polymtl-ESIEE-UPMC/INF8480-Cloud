@@ -62,10 +62,12 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
-
-	private Map<CalculationServerInterface, Integer> cacheCapacity = null;
-	private TreeMap<Integer, Integer> numberOfServerWithGivenCapacity = null;
+	private Integer result = 0;
+	private int defaultTotalCapacity = 0;
 	private int totalCapacity = 0;
+	private Map<CalculationServerInterface, Integer> cacheCapacity = null;
+	
+	private TreeMap<Integer, Integer> numberOfServerWithGivenCapacity = null;
 	private Map<Integer, Integer> overheads;
 	private Map<Integer, Integer> dangerousOverheads;
 	private ExecutorService executorService = null;
@@ -132,7 +134,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 				cacheCapacity.put(cs, sd.capacity);
 				int lastCScapacity = sd.capacity;
-				totalCapacity += lastCScapacity;
+				defaultTotalCapacity += lastCScapacity;
 				Integer currentValue = numberOfServerWithGivenCapacity.get(lastCScapacity);
 				if (currentValue == null) {
 					numberOfServerWithGivenCapacity.put(lastCScapacity, 1);
@@ -228,74 +230,118 @@ public class Repartiteur implements RepartiteurInterface {
 	// choisir mode securise || non-securise
 	@Override
 	public Integer handleOperations(List<String> operations, String mode) throws RemoteException {
+		totalCapacity = defaultTotalCapacity;
+		result = 0;
+
 		List<OperationTodo> list = new ArrayList<>();
 		for (String op : operations) {
 			String[] algo = op.split(" ");
 			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
 		}
 
-		boolean overhead = false;
-		if (list.size() > totalCapacity) {
-			overhead = true;
-		}
-
 		switch (mode) {
-		case "securise":
-			final int NEEDED_CHECK = 2;
-
-			// servers sans partenaire avec la meme capacite
-			List<CalculationServerInterface> lonelyServers = detectLonelyServers();
-
-			CalculationServerInterface idle = null;
-			if (calculationServers.size() % 2 != 0) {
-				idle = lonelyServers.get(0);
-				lonelyServers.remove(0);
-			}
-			if (overhead) {
-				Map<Integer, Integer> mapping = new HashMap<>();
-				if (lonelyServers.size() == 0) {
-					calculateOverheadForEach(list.size(), NEEDED_CHECK);
-				} else {
-					try {
-						calculateOverheadForEach(list.size(), NEEDED_CHECK, lonelyServers, mapping);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				}
-			}
-
-			List<Future<Integer>> secondResultList = new ArrayList<>();
-			assignTasks(list, lonelyServers, secondResultList);
-			checkResultList = secondResultList;
-
-			// undo modification
-			if (idle != null) {
-				lonelyServers.add(idle);
-			}
-			while (lonelyServers.size() > 0) {
-				int capacityToUndo = getCapacity(lonelyServers.get(0));
-				numberOfServerWithGivenCapacity.put(capacityToUndo, numberOfServerWithGivenCapacity.get(capacityToUndo) + 1);
-				calculationServers.add(lonelyServers.get(0));
-				lonelyServers.remove(0);
-				totalCapacity += capacityToUndo;
-			}
-			break;
-
 		case "non-securise":
-			if (overhead) {
-				calculateOverheadForEach(list.size());
-			}
-			assignTasks(list);
-			break;
+		delegateHandleOperationNonSecurise(list);
+		break;
+	
+		case "securise":
+		delegateHandleOperationSecurise(list);
+		break;
 
 		default:
 			throw new RemoteException("Erreur: mode non reconnu");
 		}
 
+		return result;
+	}
+
+	private void delegateHandleOperationNonSecurise(List<OperationTodo> list){
+		List<OperationTodo> remainingList = new ArrayList<>();
+		//TODO: TOTAL CAPCITY UPDATE
+
+		if (list.size() > totalCapacity) {
+			double averageRefusePercent = (list.size() - totalCapacity) / (4 * totalCapacity);
+			while(averageRefusePercent > 0.5){
+				remainingList.add(list.get(list.size()-1));
+				averageRefusePercent = (list.size() - totalCapacity) / (4 * totalCapacity);
+			}
+			calculateOverheadForEach(list.size());
+		}
+		
+		assignTasks(list);
+
+		boolean CHECK_WITH_SECOND_SERVER = false;
+		Integer temp = getResult(CHECK_WITH_SECOND_SERVER);
+		if(temp != null){
+			result += temp;
+			if(remainingList.size() > 0){
+				delegateHandleOperationNonSecurise(remainingList);
+			}
+		}else{
+			result = temp;
+		}
+	}
+
+	private void delegateHandleOperationSecurise(List<OperationTodo> list){
+		int REQUIRED_CHECK = 2;
+
+		List<OperationTodo> remainingList = new ArrayList<>();
+
+		//TODO: MAPPING EVEN WITHOUT OVERHEAD
+		if (list.size() > totalCapacity/REQUIRED_CHECK) {
+			double averageRefusePercent = (list.size() - totalCapacity/REQUIRED_CHECK) / 
+															(4 * totalCapacity/REQUIRED_CHECK);
+			while(averageRefusePercent > 0.4){
+				remainingList.add(list.get(list.size()-1));
+				averageRefusePercent = (list.size() - totalCapacity/REQUIRED_CHECK) / 
+															(4 * totalCapacity/REQUIRED_CHECK);
+			}
+		}
+
+		// servers sans partenaire avec la meme capacite
+		List<CalculationServerInterface> lonelyServers = detectLonelyServers();
+
+		CalculationServerInterface idle = isolateIdleServerIfThereIs(lonelyServers);
+		
+		if (list.size() > totalCapacity/REQUIRED_CHECK) {
+			if (lonelyServers.size() == 0) {
+				calculateOverheadForEach(list.size(), REQUIRED_CHECK);
+			} else {
+				try {
+					calculateOverheadForEach(list.size(), REQUIRED_CHECK, lonelyServers);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		List<Future<Integer>> secondResultList = new ArrayList<>();
+		int last_operation_index = assignTasks(list, secondResultList);
+		boolean CLEAR_RESULT_LIST = true;
+		assignTasks(list, secondResultList, lonelyServers, last_operation_index, CLEAR_RESULT_LIST);
+		checkResultList = secondResultList;
+
+		boolean CHECK_WITH_SECOND_SERVER = true;
+		Integer temp = getResult(CHECK_WITH_SECOND_SERVER);
+		if(temp != null){
+			result += temp;
+			if(remainingList.size() > 0){
+				delegateHandleOperationSecurise(remainingList);
+			}
+		}else{
+			result = temp;
+		}
+
+		for (CalculationServerInterface ls : lonelyServers) {
+			undoModification(ls);
+		}
+		if (idle != null) {
+			undoModification(idle);
+		}
+	}
+
+	private Integer getResult(boolean check){
 		int result = 0;
-		boolean check = true;
-		if (checkResultList == null)
-			check = false;
 		for (int i = 0; i < resultList.size(); i++) {
 			try {
 				if (!check) {
@@ -314,8 +360,183 @@ public class Repartiteur implements RepartiteurInterface {
 				e.printStackTrace();
 			}
 		}
-
 		return result;
+	}
+
+	private int assignTasks(List<OperationTodo> list) {
+		resultList.clear();
+
+		int from = 0;
+
+		for (CalculationServerInterface cs : calculationServers) {
+			int csCapacity = getCapacity(cs);
+			int dangerousOverheadTaken = 0;
+			if (dangerousOverheads.get(csCapacity) > 0) {
+				dangerousOverheadTaken = 1;
+				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
+			}
+
+			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
+			int final_from = from;
+
+			sendTask(list, from, to, cs);
+			from = to;
+		}
+		return from;
+	}
+
+	private int assignTasks(List<OperationTodo> list, 
+							List<Future<Integer>> secondResultList) {
+		resultList.clear();
+		secondResultList.clear();
+
+		int from = 0;
+
+		Collections.sort(calculationServers, new CalculationServerComparator());
+
+		for (int i = 0; i < calculationServers.size(); i = i + 2) {
+			CalculationServerInterface cs = calculationServers.get(i);
+			int csCapacity = getCapacity(cs);
+			int dangerousOverheadTaken = 0;
+			if (dangerousOverheads.get(csCapacity) > 0) {
+				dangerousOverheadTaken = 1;
+				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
+			}
+
+			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
+			int final_from = from;
+
+			sendTask(list, from, to, cs);
+
+			cs = calculationServers.get(i + 1);
+			sendTask(list, from, to, cs, secondResultList);
+
+			from = to;
+		}
+		return from;
+	}
+
+	private int assignTasks(List<OperationTodo> list, 
+				List<Future<Integer>> secondResultList,
+				List<CalculationServerInterface> customServers, 
+				int from, boolean clear){
+		if(clear){
+			resultList.clear();
+			secondResultList.clear();
+		}
+
+		Collections.sort(customServers, new CalculationServerComparator());
+
+		for (int i = 0; i < customServers.size(); i = i + 2) {
+			CalculationServerInterface cs = customServers.get(i);
+			int csCapacity = getCapacity(cs);
+			int dangerousOverheadTaken = 0;
+			if (dangerousOverheads.get(csCapacity) > 0) {
+				dangerousOverheadTaken = 1;
+				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
+			}
+
+			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
+			int final_from = from;
+
+			sendTask(list, from, to, cs);
+
+			cs = customServers.get(i + 1);
+			sendTask(list, from, to, cs, secondResultList);
+			from = to;
+		}
+		return from;
+	}
+
+	private void sendTask(List<OperationTodo> list, int from, int to, CalculationServerInterface cs) {
+		resultList.add(executorService.submit(() -> { // lambda Java 8 feature
+			int result = 0;
+
+			do {
+				try {
+					List<OperationTodo> sublist = new ArrayList<OperationTodo>(list.subList(from, to));
+					result = cs.calculateOperations(sublist);
+				} catch (RemoteException e) {
+
+					e.printStackTrace();
+				}
+			} while (result == -1);
+
+			return result;
+		}));
+	}
+
+	private void sendTask(List<OperationTodo> list, int from, int to,
+							CalculationServerInterface cs, List<Future<Integer>> customResultList){
+		customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
+			int result = 0;
+
+			do {
+				try {
+					List<OperationTodo> sublist = new ArrayList<OperationTodo>(list.subList(from, to));
+					result = cs.calculateOperations(sublist);
+				} catch (RemoteException e) {
+
+					e.printStackTrace();
+				}
+			} while (result == -1);
+
+			return result;
+		}));
+	}
+
+	private List<CalculationServerInterface> detectLonelyServers() {
+		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
+
+		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
+			if (entry.getValue() % 2 != 0) {
+				int capacityToRemove = entry.getKey();
+				totalCapacity -= capacityToRemove;
+
+				for (CalculationServerInterface cs : calculationServers) {
+					if (getCapacity(cs) == capacityToRemove) {
+						lonelyServers.add(cs);
+						calculationServers.remove(cs);
+						break;
+					}
+				}
+
+				numberOfServerWithGivenCapacity.put(capacityToRemove, entry.getValue() - 1);
+			}
+		}
+
+		return lonelyServers;
+	}
+
+	private CalculationServerInterface isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers){
+		if (calculationServers.size() % 2 != 0) {
+			CalculationServerInterface idle = lonelyServers.get(0);
+			lonelyServers.remove(0);
+			return idle;
+		}
+		return null;
+	}
+
+	private int getCapacity(CalculationServerInterface cs) {
+		Integer capacity = cacheCapacity.get(cs);
+		if (capacity != null) {
+			return capacity;
+		} else {
+			int temp = 0;
+			try {
+				temp = cs.getCapacity();
+			} catch (RemoteException e) {
+				e.printStackTrace();
+			}
+			cacheCapacity.put(cs, temp);
+			return temp;
+		}
+	}
+
+	private void undoModification(CalculationServerInterface cs){
+		int capacityToUndo = getCapacity(cs);
+		numberOfServerWithGivenCapacity.put(capacityToUndo, numberOfServerWithGivenCapacity.get(capacityToUndo) + 1);
+		calculationServers.add(cs);
 	}
 
 	// NON-SECURISE MODE
@@ -337,8 +558,9 @@ public class Repartiteur implements RepartiteurInterface {
 
 	// SECURISE MODE SANS LONELY SERVERS
 	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor) {
-		int halfTotalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
-		double averageRefusePercent = (operationsSize - halfTotalCapacity) / (4 * halfTotalCapacity);
+		totalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
+
+		double averageRefusePercent = (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
@@ -359,32 +581,20 @@ public class Repartiteur implements RepartiteurInterface {
 
 	// SECURISE MODE AVEC LONELY SERVERS
 	private void calculateOverheadForEach(int operationsSize, int multipleCheckFactor,
-		List<CalculationServerInterface> lonelyServers, Map<Integer, Integer> mapping) throws Exception {
-
-		Collections.sort(lonelyServers, new CalculationServerComparator());
+										List<CalculationServerInterface> lonelyServers) throws Exception {
 
 		if (lonelyServers.size() % multipleCheckFactor != 0) {
 			throw new Exception("FATAL: le nombre de lonelyServer est incoherent");
 		}
 
-		/**
-		 * REQUIREMENTS VARIABLES TO CALCULATE DANGEROUS OVERHEAD FROM LONELY SERVERS
-		 */
+		Collections.sort(lonelyServers, new CalculationServerComparator());
 		TreeMap<Integer, Integer> lonelyServersWithGivenCapacity = new TreeMap<>();
-		int virtualTotalCapacity = totalCapacity;
-		for (int i = lonelyServers.size() - 1; i > -1; i = i - multipleCheckFactor) {
-			int lowerCapacity = getCapacity(lonelyServers.get(i - (multipleCheckFactor - 1)));
-			mapping.put(getCapacity(lonelyServers.get(i)), lowerCapacity);
-			virtualTotalCapacity += lowerCapacity * multipleCheckFactor;
-			lonelyServersWithGivenCapacity.put(lowerCapacity, multipleCheckFactor);
-		}
-		/**
-		 * ================================================================
-		 */
+		Map<Integer, Integer> mapping = new HashMap<>();
+		mapLonelyServerToLowestPartner(lonelyServers, lonelyServersWithGivenCapacity, mapping, multipleCheckFactor);
 
-		// using virtualTotalCapacity instead of totalCapacity
-		int halfTotalCapacity = (int) Math.floor(virtualTotalCapacity / multipleCheckFactor);
-		double averageRefusePercent = (operationsSize - halfTotalCapacity) / (4 * halfTotalCapacity);
+		totalCapacity = (int) Math.floor(totalCapacity / multipleCheckFactor);
+
+		double averageRefusePercent = (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
@@ -398,20 +608,21 @@ public class Repartiteur implements RepartiteurInterface {
 
 		for (Map.Entry<Integer, Integer> entry : lonelyServersWithGivenCapacity.entrySet()) {
 
-			Integer currentCapacity = mapping.get(entry.getKey());
-			if (currentCapacity == null) {
-				currentCapacity = entry.getKey();
+			Integer mappedCapacity = mapping.get(entry.getKey());
+			if (mappedCapacity == null) {
+				mappedCapacity = entry.getKey();
 			}
 
-			overhead = averageRefusePercent * 4 * currentCapacity;
+			overhead = averageRefusePercent * 4 * mappedCapacity;
 			double currentDangerousOverhead = (overhead - Math.floor(overhead)) * entry.getValue()/ multipleCheckFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
-			Integer currentValue = overheads.get(currentCapacity);
+			Integer currentValue = overheads.get(mappedCapacity);
 			if (currentValue == null) {
-				overheads.put(currentCapacity, (int) Math.floor(overhead));
+				overheads.put(mappedCapacity, (int) Math.floor(overhead));
 			}
 		}
+
 		try {
 			calculateDangerousOverheadForEarch((int) Math.ceil(dangerousOverhead), 
 									multipleCheckFactor, lonelyServersWithGivenCapacity);
@@ -491,153 +702,18 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
-	private void assignTasks(List<OperationTodo> list) {
-		int from = 0;
+	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers,
+												TreeMap<Integer, Integer> lonelyServersWithGivenCapacity,
+												Map<Integer, Integer> mapping, int multipleCheckFactor){
+		/**
+		 * TRACKING COUNT OF LONELY SERVERS CAPACITY
+		 */
+		for (int i = lonelyServers.size()-1; i > -1; i -= multipleCheckFactor) {
+			int lowestCapacity = getCapacity(lonelyServers.get(i - (multipleCheckFactor-1)));
+			totalCapacity += lowestCapacity * multipleCheckFactor;
 
-		for (CalculationServerInterface cs : calculationServers) {
-			int csCapacity = getCapacity(cs);
-			int dangerousOverheadTaken = 0;
-			if (dangerousOverheads.get(csCapacity) > 0) {
-				dangerousOverheadTaken = 1;
-				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
-			}
-
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
-			int final_from = from;
-
-			sendTask(list, from, to, cs);
-			from = to;
-		}
-	}
-
-	private void assignTasks(List<OperationTodo> list, 
-							 List<CalculationServerInterface> lonelyServers,
-							 List<Future<Integer>> secondResultList) {
-		int from = 0;
-
-		Collections.sort(calculationServers, new CalculationServerComparator());
-
-		for (int i = 0; i < calculationServers.size(); i = i + 2) {
-			CalculationServerInterface cs = calculationServers.get(i);
-			int csCapacity = getCapacity(cs);
-			int dangerousOverheadTaken = 0;
-			if (dangerousOverheads.get(csCapacity) > 0) {
-				dangerousOverheadTaken = 1;
-				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
-			}
-
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
-			int final_from = from;
-
-			sendTask(list, from, to, cs);
-
-			cs = calculationServers.get(i + 1);
-			sendTask(list, from, to, cs, secondResultList);
-
-			from = to;
-		}
-	}
-
-	private void assignTasksToLonelyServers(List<OperationTodo> list, 
-				List<CalculationServerInterface> lonelyServers, 
-				List<Future<Integer>> secondResultList,
-				int from){
-
-		Collections.sort(lonelyServers, new CalculationServerComparator());
-
-		for (int i = 0; i < lonelyServers.size(); i = i + 2) {
-			CalculationServerInterface cs = lonelyServers.get(i);
-			int csCapacity = getCapacity(cs);
-			int dangerousOverheadTaken = 0;
-			if (dangerousOverheads.get(csCapacity) > 0) {
-				dangerousOverheadTaken = 1;
-				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
-			}
-
-			int to = from + csCapacity + overheads.get(csCapacity) + dangerousOverheadTaken;
-			int final_from = from;
-
-			sendTask(list, from, to, cs);
-
-			cs = lonelyServers.get(i + 1);
-			sendTask(list, from, to, cs, secondResultList);
-			from = to;
-		}
-	}
-
-	private void sendTask(List<OperationTodo> list, int from, int to, CalculationServerInterface cs) {
-		resultList.add(executorService.submit(() -> { // lambda Java 8 feature
-			int result = 0;
-
-			do {
-				try {
-					List<OperationTodo> sublist = new ArrayList<OperationTodo>(list.subList(from, to));
-					result = cs.calculateOperations(sublist);
-				} catch (RemoteException e) {
-
-					e.printStackTrace();
-				}
-			} while (result == -1);
-
-			return result;
-		}));
-	}
-
-	private void sendTask(List<OperationTodo> list, int from, int to,
-							CalculationServerInterface cs, List<Future<Integer>> secondResultList){
-		secondResultList.add(executorService.submit(() -> { // lambda Java 8 feature
-			int result = 0;
-
-			do {
-				try {
-					List<OperationTodo> sublist = new ArrayList<OperationTodo>(list.subList(from, to));
-					result = cs.calculateOperations(sublist);
-				} catch (RemoteException e) {
-
-					e.printStackTrace();
-				}
-			} while (result == -1);
-
-			return result;
-		}));
-	}
-
-	private List<CalculationServerInterface> detectLonelyServers() {
-		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
-
-		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
-			if (entry.getValue() % 2 != 0) {
-				int capacityToRemove = entry.getKey();
-				totalCapacity -= capacityToRemove;
-
-				for (CalculationServerInterface cs : calculationServers) {
-					if (getCapacity(cs) == capacityToRemove) {
-						lonelyServers.add(cs);
-						calculationServers.remove(cs);
-						break;
-					}
-				}
-
-				numberOfServerWithGivenCapacity.put(capacityToRemove, entry.getValue() - 1);
-			}
-		}
-
-		return lonelyServers;
-	}
-
-	private int getCapacity(CalculationServerInterface cs) {
-		Integer capacity = cacheCapacity.get(cs);
-		if (capacity != null) {
-			return capacity;
-		} else {
-			int temp = 0;
-			try {
-				temp = cs.getCapacity();
-			} catch (RemoteException e) {
-				e.printStackTrace();
-			}
-			cacheCapacity.put(cs, temp);
-			return temp;
+			lonelyServersWithGivenCapacity.put(lowestCapacity, multipleCheckFactor);
+			mapping.put(getCapacity(lonelyServers.get(i)), lowestCapacity);
 		}
 	}
 }

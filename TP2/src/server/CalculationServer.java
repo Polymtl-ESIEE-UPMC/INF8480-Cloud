@@ -144,7 +144,7 @@ public class CalculationServer implements CalculationServerInterface {
 	public int calculateOperations(List<OperationTodo> operations) throws RemoteException {
 		if(!acceptTask(operations.size())){
 			//opération refusée
-			//System.out.println("refuse");
+			System.out.println("refuse");
 			return -1;
 		}
 
@@ -160,7 +160,7 @@ public class CalculationServer implements CalculationServerInterface {
 		for (OperationTodo op : operations) {
 			result = (result + op.execute()) % 4000;
 		}
-
+		System.out.println(result);
 		return result;
 	}
 
