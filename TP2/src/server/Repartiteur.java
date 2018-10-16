@@ -279,7 +279,7 @@ public class Repartiteur implements RepartiteurInterface {
 		clearOverHeads();
 		clearTracking();
 
-		return result;
+		return result%4000;
 	}
 
 	private void delegateHandleOperationNonSecurise(List<OperationTodo> list) {
@@ -370,31 +370,31 @@ public class Repartiteur implements RepartiteurInterface {
 									List<Future<Integer>> customResultList) {
 
 		customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
-			int result = 0;
+			int res = 0;
 
 			do {
 				try {
-					result = cs.calculateOperations(todos);
+					res = cs.calculateOperations(todos);
 				} catch (RemoteException e) {
 
 					e.printStackTrace();
 				}
-			} while (result == -1);
+			} while (res == -1);
 
-			return result;
+			return res;
 		}));
 	}
 
 	private Integer getResult(boolean check) {
-		int result = 0;
+		int res = 0;
 		for (int i = 0; i < resultList.size(); i++) {
 			try {
 				if (!check) {
-					result = (result + resultList.get(i).get()) % 4000;
+					res = (res + resultList.get(i).get()) % 4000;
 				} else {
 					int temp = resultList.get(i).get();
 					if (temp == checkResultList.get(i).get()) {
-						result = (result + temp) % 4000;
+						res = (res + temp) % 4000;
 					} else {
 						return null;
 					}
@@ -405,7 +405,7 @@ public class Repartiteur implements RepartiteurInterface {
 				e.printStackTrace();
 			}
 		}
-		return result;
+		return res;
 	}
 
 	private void calculateOverheadForEach(int operationsSize, int checkFactor) {
