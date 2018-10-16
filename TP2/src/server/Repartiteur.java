@@ -99,15 +99,13 @@ public class Repartiteur implements RepartiteurInterface {
 	private void run() {
 
 		try {
-			RepartiteurInterface stub =
-					(RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
+			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
 			Registry registry = LocateRegistry.getRegistry();
 
 			registry.rebind("repartiteur", stub);
 			System.out.println("Repartiteur ready.");
 		} catch (ConnectException e) {
-			System.err.println(
-					"Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
+			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
 		} catch (Exception e) {
@@ -117,8 +115,7 @@ public class Repartiteur implements RepartiteurInterface {
 		checkExistingRepartiteur();
 
 		if (account.userName == null || account.password == null) {
-			System.err
-					.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
+			System.err.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
 			return;
 		}
 
@@ -129,15 +126,13 @@ public class Repartiteur implements RepartiteurInterface {
 				return;
 			}
 		} catch (RemoteException e) {
-			System.err.println(
-					"Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
+			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
 
 		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd);
-				CalculationServerInterface cs =
-						InterfaceLoader.loadCalculationServer(sd.ip, sd.port);
+				CalculationServerInterface cs = InterfaceLoader.loadCalculationServer(sd.ip, sd.port);
 				calculationServers.add(cs);
 
 				cacheCapacity.put(cs, sd.capacity);
@@ -153,8 +148,7 @@ public class Repartiteur implements RepartiteurInterface {
 				dangerousOverheads.put(lastCScapacity, 0);
 			}
 		} catch (RemoteException e) {
-			System.err.println(
-					"Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
+			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
 
 		// creer ThreadPool size = nombre de CalculationServer
@@ -162,8 +156,8 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	/**
-	 * Lis le fichier d'informations de compte (s'il existe) et s'assure que le compte a un format
-	 * valide
+	 * Lis le fichier d'informations de compte (s'il existe) et s'assure que le
+	 * compte a un format valide
 	 */
 	private void checkExistingRepartiteur() {
 		try {
@@ -183,8 +177,7 @@ public class Repartiteur implements RepartiteurInterface {
 				}
 			}
 		} catch (FileNotFoundException e) {
-			System.out.println(
-					"Aucun fichier d'information de compte détecté, génération automatique d'un compte");
+			System.out.println("Aucun fichier d'information de compte détecté, génération automatique d'un compte");
 			createRepartiteur();
 		}
 	}
@@ -202,12 +195,10 @@ public class Repartiteur implements RepartiteurInterface {
 					ps.println(password);
 					System.out.println("Création du répartiteur réussie!");
 				} catch (FileNotFoundException e) {
-					System.err.println(
-							"Problème lors de la création du fichier d'informations de compte.");
+					System.err.println("Problème lors de la création du fichier d'informations de compte.");
 				}
 			} else {
-				System.out.println(
-						"Ce nom d'utilisateur n'est pas disponible, veuillez recommencer.");
+				System.out.println("Ce nom d'utilisateur n'est pas disponible, veuillez recommencer.");
 			}
 		} catch (RemoteException err) {
 			System.err.println(
@@ -243,7 +234,7 @@ public class Repartiteur implements RepartiteurInterface {
 	public Integer handleOperations(List<String> operations, String mode) throws RemoteException {
 		totalCapacity = defaultTotalCapacity;
 		System.out.println("Create virtual capacity");
-		for(Map.Entry<CalculationServerInterface, Integer> entry : cacheCapacity.entrySet()){
+		for (Map.Entry<CalculationServerInterface, Integer> entry : cacheCapacity.entrySet()) {
 			virtualCapacity.put(entry.getKey(), entry.getValue());
 		}
 		result = 0;
@@ -255,31 +246,32 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 
 		switch (mode) {
-			case "non-securise":
-				delegateHandleOperationNonSecurise(list);
-				break;
+		case "non-securise":
+			delegateHandleOperationNonSecurise(list);
+			break;
 
-			case "securise":
-				// servers sans partenaire avec la meme capacite
-				if (calculationServers.size() > 1) {
-					int checkFactor = 2;
-					CalculationServerInterface idle = detectLonelyServers(checkFactor);
-					delegateHandleOperationSecurise(list, checkFactor);
-					if(idle != null) undoModification(idle);
-				} else {
-					System.out.println("Il n'y a pas suffisamment de serveur de calcul");
-					System.out.println("Switch au mode non-securise automatiquement");
-					return handleOperations(operations, "non-securise");
-				}
-				break;
+		case "securise":
+			// servers sans partenaire avec la meme capacite
+			if (calculationServers.size() > 1) {
+				int checkFactor = 2;
+				CalculationServerInterface idle = detectLonelyServers(checkFactor);
+				delegateHandleOperationSecurise(list, checkFactor);
+				if (idle != null)
+					undoModification(idle);
+			} else {
+				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
+				System.out.println("Switch au mode non-securise automatiquement");
+				return handleOperations(operations, "non-securise");
+			}
+			break;
 
-			default:
-				throw new RemoteException("Erreur: mode non reconnu");
+		default:
+			throw new RemoteException("Erreur: mode non reconnu");
 		}
 		clearOverHeads();
 		clearTracking();
 
-		return result%4000;
+		return result % 4000;
 	}
 
 	private void delegateHandleOperationNonSecurise(List<OperationTodo> list) {
@@ -287,9 +279,9 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void delegateHandleOperationSecurise(List<OperationTodo> list, int checkFactor) {
-		
+
 		boolean CHECK_WITH_SECOND_SERVER = false;
-		if(checkFactor > 1){
+		if (checkFactor > 1) {
 			CHECK_WITH_SECOND_SERVER = true;
 		}
 
@@ -333,7 +325,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		while (i < calculationServers.size()) {
 			int csCapacity = getCapacity(calculationServers.get(i));
-			
+
 			int overhead = 0;
 			if (overheads.get(csCapacity) != null) {
 				overhead = overheads.get(csCapacity);
@@ -342,17 +334,17 @@ public class Repartiteur implements RepartiteurInterface {
 			int dangerousOverheadTaken = 0;
 			if (dangerousOverheads.get(csCapacity) != null && dangerousOverheads.get(csCapacity) > 0) {
 				dangerousOverheadTaken = 1;
-				dangerousOverheads.put(csCapacity,
-						dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
+				dangerousOverheads.put(csCapacity, dangerousOverheads.get(csCapacity) - dangerousOverheadTaken);
 			}
-			
+
 			int to = from + csCapacity + overhead + dangerousOverheadTaken;
-			if(list.size() < to) to = list.size();
+			if (list.size() < to)
+				to = list.size();
 
 			List<OperationTodo> todo = new ArrayList<>(list.subList(from, to));
 
 			sendTask(todo, calculationServers.get(i));
-			if(i != i + checkFactor - 1){
+			if (i != i + checkFactor - 1) {
 				sendTask(todo, calculationServers.get(i + checkFactor - 1), checkResultList);
 			}
 			i += checkFactor;
@@ -367,7 +359,7 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs,
-									List<Future<Integer>> customResultList) {
+			List<Future<Integer>> customResultList) {
 
 		customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
 			int res = 0;
@@ -411,15 +403,14 @@ public class Repartiteur implements RepartiteurInterface {
 	private void calculateOverheadForEach(int operationsSize, int checkFactor) {
 		totalCapacity = (int) Math.floor(totalCapacity / checkFactor);
 
-		double averageRefusePercent =
-				(double) (operationsSize - totalCapacity) / (4 * totalCapacity);
+		double averageRefusePercent = (double) (operationsSize - totalCapacity) / (4 * totalCapacity);
 		double dangerousOverhead = 0.0;
 		double overhead = 0.0;
 
 		for (Map.Entry<Integer, Integer> entry : numberOfServerWithGivenCapacity.entrySet()) {
 			overhead = (double) averageRefusePercent * 4 * entry.getKey();
-			double currentDangerousOverhead =
-					(double) (overhead - Math.floor(overhead)) * entry.getValue() / checkFactor;
+			double currentDangerousOverhead = (double) (overhead - Math.floor(overhead)) * entry.getValue()
+					/ checkFactor;
 			dangerousOverhead += currentDangerousOverhead;
 
 			overheads.put(entry.getKey(), (int) Math.floor(overhead));
@@ -467,12 +458,14 @@ public class Repartiteur implements RepartiteurInterface {
 		idle = isolateIdleServerIfThereIs(lonelyServers, checkFactor);
 		mapLonelyServerToLowestPartner(lonelyServers, checkFactor);
 
-		if(idle != null) calculationServers.remove(idle);
-		
+		if (idle != null)
+			calculationServers.remove(idle);
+
 		return idle;
 	}
 
-	private CalculationServerInterface isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers, int checkFactor) {
+	private CalculationServerInterface isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers,
+			int checkFactor) {
 		if (calculationServers.size() % checkFactor != 0) {
 			CalculationServerInterface idle = lonelyServers.get(0);
 			lonelyServers.remove(idle);
@@ -492,13 +485,14 @@ public class Repartiteur implements RepartiteurInterface {
 
 			virtualCapacity.put(lonelyServers.get(i), lowestCapacity);
 			Integer currentValue = numberOfServerWithGivenCapacity.get(lowestCapacity);
-			if(currentValue == null) currentValue = 0;
+			if (currentValue == null)
+				currentValue = 0;
 			numberOfServerWithGivenCapacity.put(lowestCapacity, currentValue + checkFactor);
 		}
 	}
 
-	private void syncCapacity(){
-		for(CalculationServerInterface cs:calculationServers){
+	private void syncCapacity() {
+		for (CalculationServerInterface cs : calculationServers) {
 			Integer capacity = cacheCapacity.get(cs);
 			if (capacity == null) {
 				System.out.println("Object changed");
@@ -519,14 +513,13 @@ public class Repartiteur implements RepartiteurInterface {
 			syncCapacity();
 			capacity = cacheCapacity.get(cs);
 			virtualCapacity.put(cs, capacity);
-		} 
+		}
 		return capacity;
 	}
 
 	private void undoModification(CalculationServerInterface cs) {
 		int capacityToUndo = getCapacity(cs);
-		numberOfServerWithGivenCapacity.put(capacityToUndo,
-				numberOfServerWithGivenCapacity.get(capacityToUndo) + 1);
+		numberOfServerWithGivenCapacity.put(capacityToUndo, numberOfServerWithGivenCapacity.get(capacityToUndo) + 1);
 		calculationServers.add(cs);
 	}
 
