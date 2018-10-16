@@ -682,16 +682,16 @@ public class Repartiteur implements RepartiteurInterface {
 			}
 		}
 
-		delegateCalculateDangerousOverheadForEach(dangerousOverhead, concatenateMap);
+		delegateCalculateDangerousOverheadForEachWithCheck(dangerousOverhead, concatenateMap);
 	}
 
 	private void calculateDangerousOverheadForEachWithoutLonely(int dangerousOverhead)
 			throws Exception {
-		delegateCalculateDangerousOverheadForEach(dangerousOverhead,
+		delegateCalculateDangerousOverheadForEachWithCheck(dangerousOverhead,
 				numberOfServerWithGivenCapacity);
 	}
 
-	private void delegateCalculateDangerousOverheadForEach(int dangerousOverhead,
+	private void delegateCalculateDangerousOverheadForEachWithCheck(int dangerousOverhead,
 			TreeMap<Integer, Integer> customMap) throws Exception {
 
 		NavigableMap reverse = customMap.descendingMap();
