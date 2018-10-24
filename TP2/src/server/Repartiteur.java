@@ -14,6 +14,7 @@ import shared.CalculationServerInterface;
 import shared.InterfaceLoader;
 import shared.OperationTodo;
 import shared.RepartiteurInterface;
+import shared.Response;
 import shared.Account;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -60,7 +61,6 @@ public class Repartiteur implements RepartiteurInterface {
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
-	private Integer result = 0;
 	private int defaultTotalCapacity = 0;
 	private int totalCapacity = 0;
 	private Map<CalculationServerInterface, Integer> cacheCapacity = null;
@@ -72,8 +72,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private TreeMap<Integer, Integer> countCapacity = null;
 	private Map<Integer, Integer> overheads;
 	private Map<Integer, Integer> dangerousOverheads;
-	private List<Future<Integer>> resultList = null;
-	private List<Future<Integer>> checkResultList = null;
+	private List<Future<Response>> resultList = null;
+	private List<Future<Response>> checkResultList = null;
 
 	public Repartiteur(String authServerHostName) {
 		super();
@@ -233,14 +233,15 @@ public class Repartiteur implements RepartiteurInterface {
 
 	// choisir mode securise || non-securise
 	@Override
-	public Integer handleOperations(List<String> operations, String mode) throws RemoteException {
+	public int handleOperations(List<String> operations, String mode) throws RemoteException {
 		resetTrackingCapacity();
 
 		List<OperationTodo> list = parseStringToOperations(operations);
+		int result = 0;
 
 		switch (mode) {
 		case "non-securise":
-			delegateHandleOperationNonSecurise(list);
+			result = delegateHandleOperationNonSecurise(list);
 			break;
 
 		case "securise":
@@ -248,7 +249,7 @@ public class Repartiteur implements RepartiteurInterface {
 				int checkFactor = 2;
 				CalculationServerInterface idle = detectLonelyServers(checkFactor);
 				updateTrackingCapacity(checkFactor);
-				delegateHandleOperationSecurise(list, checkFactor);
+				result = delegateHandleOperationSecurise(list, checkFactor);
 
 				if (idle != null)
 					calculationServers.add(idle); // undo modification
@@ -256,7 +257,7 @@ public class Repartiteur implements RepartiteurInterface {
 			} else {
 				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
 				System.out.println("Switch au mode non-securise automatiquement");
-				delegateHandleOperationNonSecurise(list);
+				result = delegateHandleOperationNonSecurise(list);
 			}
 			break;
 
@@ -266,7 +267,7 @@ public class Repartiteur implements RepartiteurInterface {
 		clearOverHeads();
 		clearTracking();
 
-		return result % 4000;
+		return (int) result%4000;
 	}
 
 	private List<OperationTodo> parseStringToOperations(List<String> operations) {
@@ -278,13 +279,14 @@ public class Repartiteur implements RepartiteurInterface {
 		return list;
 	}
 
-	private void delegateHandleOperationNonSecurise(List<OperationTodo> list) {
-		delegateHandleOperationSecurise(list, 1);
+	private int delegateHandleOperationNonSecurise(List<OperationTodo> list) {
+		return delegateHandleOperationSecurise(list, 1);
 	}
 
-	private void delegateHandleOperationSecurise(List<OperationTodo> list, int checkFactor) {
+	private int delegateHandleOperationSecurise(List<OperationTodo> list, int checkFactor) {
 
 		clearOverHeads();
+		clearTracking();
 
 		boolean CHECK_WITH_SECOND_SERVER = false;
 		if (checkFactor > 1) {
@@ -307,19 +309,14 @@ public class Repartiteur implements RepartiteurInterface {
 
 		assignTasks(list, checkFactor);
 
-		Integer temp = getResult(CHECK_WITH_SECOND_SERVER);
-		if (temp != null) {
-			result += temp;
-			if (remainingList.size() > 0) {
-				delegateHandleOperationSecurise(remainingList, checkFactor);
-			}
-		} else {
-			result = temp;
+		int temp = getResult(CHECK_WITH_SECOND_SERVER, checkFactor);
+		if (remainingList.size() > 0) {
+			return temp + delegateHandleOperationSecurise(remainingList, checkFactor);
 		}
+		return temp;
 	}
 
 	private int assignTasks(List<OperationTodo> list, int checkFactor) {
-		resultList.clear();
 
 		int from = 0;
 		int i = 0;
@@ -360,36 +357,52 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs,
-			List<Future<Integer>> customResultList) {
+			List<Future<Response>> customResultList) {
 
-		customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
-			int res = 0;
-
-			do {
-				try {
-					res = cs.calculateOperations(todos);
-				} catch (RemoteException e) {
-
-					e.printStackTrace();
-				}
-			} while (res == -1);
-
-			return res;
-		}));
+		if(todos.size() > 0){
+			customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
+				int res = 0;
+	
+				do {
+					try {
+						res = cs.calculateOperations(todos);
+					} catch (RemoteException e) {
+	
+						e.printStackTrace();
+					}
+				} while (res == -1);
+	
+				return new Response(cs, todos, res);
+			}));
+		}
 	}
 
-	private Integer getResult(boolean check) {
+	private int getResult(boolean check, int checkFactor) {
 		int res = 0;
+		List<OperationTodo> redo = new ArrayList<>();
 		for (int i = 0; i < resultList.size(); i++) {
 			try {
 				if (!check) {
-					res = (res + resultList.get(i).get()) % 4000;
+					res = (res + resultList.get(i).get().res) % 4000;
 				} else {
-					int temp = resultList.get(i).get();
-					if (temp == checkResultList.get(i).get()) {
+					Response response = resultList.get(i).get();
+					Response checkResponse = checkResultList.get(i).get();
+					int temp = response.res;
+					if (temp == checkResponse.res) {
 						res = (res + temp) % 4000;
 					} else {
-						return null;
+						// System.out.println("res "+response.res);
+						// for(OperationTodo op : response.operations){
+						// 	System.out.print(op.name+" "+op.parameter+" / ");
+						// }
+						// System.out.println("");
+						// System.out.println("check "+checkResponse.res);
+						// for(OperationTodo op : checkResponse.operations){
+						// 	System.out.print(op.name+" "+op.parameter+" / ");
+						// }
+						// System.out.println("");
+						// Thread.sleep(5000);
+						redo.addAll(response.operations);
 					}
 				}
 			} catch (ExecutionException e) {
@@ -398,6 +411,7 @@ public class Repartiteur implements RepartiteurInterface {
 				e.printStackTrace();
 			}
 		}
+		if(redo.size() > 0) return res + delegateHandleOperationSecurise(redo, checkFactor);
 		return res;
 	}
 
@@ -536,8 +550,6 @@ public class Repartiteur implements RepartiteurInterface {
 		for (Map.Entry<Integer, Integer> entry : cacheCountCapacity.entrySet()) {
 			countCapacity.put(entry.getKey(), entry.getValue());
 		}
-
-		result = 0;
 	}
 
 	private void updateTrackingCapacity(int checkFactor) {

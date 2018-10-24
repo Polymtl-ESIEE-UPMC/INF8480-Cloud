@@ -8,5 +8,5 @@ import java.util.List;
 
 public interface RepartiteurInterface extends Remote {
     public int handleOperations(List<String> operations) throws RemoteException;
-    public Integer handleOperations(List<String> operations, String mode) throws RemoteException;
+    public int handleOperations(List<String> operations, String mode) throws RemoteException;
 }

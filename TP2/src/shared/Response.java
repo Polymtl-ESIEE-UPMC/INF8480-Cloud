@@ -1,11 +1,15 @@
 package shared;
 
+import java.util.List;
+
 public class Response{
-    public String filename;
+    public CalculationServerInterface cs;
+    public List<OperationTodo> operations;
     public int res;
 
-    public Response(String filename, int res){
-        this.filename = filename;
+    public Response(CalculationServerInterface cs, List<OperationTodo> operations, int res){
+        this.cs = cs;
+        this.operations = operations;
         this.res = res;
     }
 }

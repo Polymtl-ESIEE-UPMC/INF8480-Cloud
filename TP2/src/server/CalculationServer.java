@@ -151,7 +151,7 @@ public class CalculationServer implements CalculationServerInterface {
 		System.out.println("Handling " + operations.size() + " operations.");
 		float randF = random.nextFloat();
 
-		if(badPercent > randF){
+		if(badPercent > randF*100){
 			//retourner une valeur malicieuse
 			return random.nextInt(4000);
 		}
