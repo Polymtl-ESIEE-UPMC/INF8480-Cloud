@@ -39,8 +39,20 @@ import java.util.concurrent.Future;
 public class Repartiteur implements RepartiteurInterface {
 
 	private class CalculationServerComparator implements Comparator<CalculationServerInterface> {
+		private String mode;
+
+		public CalculationServerComparator(){
+			mode = "ascending";
+		}
+
+		public CalculationServerComparator(String m){
+			if(m == "descending") mode = m;
+			else System.out.println("ERROR: mode non regconize, ascending par default");
+		}
+
 		@Override
 		public int compare(CalculationServerInterface o1, CalculationServerInterface o2) {
+			if(mode == "descending") return Integer.compare(getCapacity(o2), getCapacity(o1));
 			return Integer.compare(getCapacity(o1), getCapacity(o2));
 		}
 	}
@@ -216,19 +228,24 @@ public class Repartiteur implements RepartiteurInterface {
 	public int handleOperations(List<String> operations) throws RemoteException {
 		resetTrackingCapacity();
 
+		System.out.println("Default total capacity: "+defaultTotalCapacity);
+
 		List<OperationTodo> list = parseStringToOperations(operations);
-		int result = 0;
+		int finalResult = 0;
 
 		switch (mode) {
 		case "non-securise":
-			result = delegateHandleOperationNonSecurise(list);
+			finalResult = delegateHandleOperationNonSecurise(list);
 			break;
 
 		case "securise":
 			if (calculationServers.size() > 1) {
 				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
 				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
-				result = delegateHandleOperationSecurise(list, NUMBER_OF_CHECK_REQUIRED);
+
+				System.out.println("Current total capacity: "+totalCapacity);
+
+				finalResult = delegateHandleOperationSecurise(list, NUMBER_OF_CHECK_REQUIRED);
 
 				if (idle != null)
 					calculationServers.add(idle); // Undo modification
@@ -236,7 +253,7 @@ public class Repartiteur implements RepartiteurInterface {
 			} else {
 				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
 				System.out.println("Switch au mode non-securise automatiquement");
-				result = delegateHandleOperationNonSecurise(list);
+				finalResult = delegateHandleOperationNonSecurise(list);
 			}
 			break;
 
@@ -244,7 +261,7 @@ public class Repartiteur implements RepartiteurInterface {
 			throw new RemoteException("Erreur: mode non reconnu");
 		}
 
-		return (int) result%4000;
+		return (int) finalResult%4000;
 	}
 
 	private List<OperationTodo> parseStringToOperations(List<String> operations) {
@@ -278,23 +295,27 @@ public class Repartiteur implements RepartiteurInterface {
 			calculateOverheadForEach(averageRefusePercent);
 		}
 
-		List<Future<Response>> resultList = new ArrayList<>();
+		List<List<Future<Response>>> globalResultList = assignTasks(list, checkFactor);
 
-		List<Future<Response>> checkResultList = assignTasks(list, checkFactor, resultList);
-
-		int temp = checkResultList != null ? 
-					getResult(resultList, checkResultList, remainingList) : getResult(resultList);
+		int temp = getResult(globalResultList, remainingList);
 		if (remainingList.size() > 0) {
 			return temp + delegateHandleOperationSecurise(remainingList, checkFactor);
 		}
 		return temp;
 	}
 
-	private List<Future<Response>> assignTasks(List<OperationTodo> list, int checkFactor, List<Future<Response>> resultList) {
+	private List<List<Future<Response>>> assignTasks(List<OperationTodo> list, int checkFactor) {
 
 		int from = 0;
 		int i = 0;
-		List<Future<Response>> checkResultList = checkFactor > 1 ? new ArrayList<>() : null;
+		
+		List<List<Future<Response>>> globalResultList = new ArrayList<>();
+		for (int j=0; j<checkFactor; j++){
+			globalResultList.add(new ArrayList<>());
+		}
+		List<Future<Response>> resultList = globalResultList.get(0);
+		List<List<Future<Response>>> checkResultList = null;
+		if (globalResultList.size() > 1) checkResultList = globalResultList.subList(1, globalResultList.size());
 
 		while (i < calculationServers.size()) {
 			int csCapacity = getCapacity(calculationServers.get(i));
@@ -318,26 +339,24 @@ public class Repartiteur implements RepartiteurInterface {
 
 			sendTask(todo, calculationServers.get(i), resultList);
 			if (checkResultList != null) {
-				checkResultList.addAll(sendTestTask(todo, i, checkFactor));
+				int j = i;
+				for (List<Future<Response>> checkResult : checkResultList){
+					sendTask(todo, calculationServers.get(j + checkFactor - 1), checkResult);
+					j++;
+				}
 			}
 			i += checkFactor;
 
 			from = to;
 		}
-		return checkResultList;
-	}
-
-	private List<Future<Response>> sendTestTask(List<OperationTodo> todo, int i, int checkFactor){
-		List<Future<Response>> checkResultList = new ArrayList<>();
-		sendTask(todo, calculationServers.get(i + checkFactor - 1), checkResultList);
-		return checkResultList;
+		return globalResultList;
 	}
 
 	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs,
-			List<Future<Response>> customResultList) {
+			List<Future<Response>> customResult) {
 
 		if(todos.size() > 0){
-			customResultList.add(executorService.submit(() -> { // lambda Java 8 feature
+			customResult.add(executorService.submit(() -> { // lambda Java 8 feature
 				int res = 0;
 	
 				do {
@@ -354,22 +373,19 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
-	private int getResult(List<Future<Response>> resultList){
-		return getResult(resultList, null, null);
-	}
-
-	private int getResult(List<Future<Response>> resultList, List<Future<Response>> checkResultList, List<OperationTodo> remainingList) {
+	private int getResult(List<List<Future<Response>>> globalResultList, List<OperationTodo> remainingList) {
 		int res = 0;
-		boolean check = checkResultList != null ? true : false;
-		for (int i = 0; i < resultList.size(); i++) {
+		List<Future<Response>> result = globalResultList.get(0);
+		boolean check = globalResultList.size() == 1 ? false : true;
+		for (int i = 0; i < result.size(); i++) {
 			try {
 				if (!check) {
-					res = (res + resultList.get(i).get().res) % 4000;
+					res = (res + result.get(i).get().res) % 4000;
 				} else {
-					Response response = resultList.get(i).get();
-					Response checkResponse = checkResultList.get(i).get();
+					Response response = result.get(i).get();
 					int temp = response.res;
-					if (temp == checkResponse.res) {
+					List<List<Future<Response>>> checkResultList = globalResultList.subList(1, globalResultList.size());
+					if (checkMalicious(temp, checkResultList, i)) {
 						res = (res + temp) % 4000;
 					} else {
 						remainingList.addAll(response.operations);
@@ -382,6 +398,20 @@ public class Repartiteur implements RepartiteurInterface {
 			}
 		}
 		return res;
+	}
+
+	private boolean checkMalicious(int res, List<List<Future<Response>>> checkResultList, int index){
+		List<Future<Response>> checkResult = checkResultList.get(0);
+		try{
+			if(res == checkResult.get(index).get().res) return true;
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+			return false;
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+			return false;
+		}
+		return false;
 	}
 
 	private void calculateOverheadForEach(double averageRefusePercent) {
@@ -456,19 +486,23 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
 
+		System.out.println("Map les serveurs lonely au partner de capacity la plus petite");
+
 		Collections.sort(lonelyServers, new CalculationServerComparator());
-		for (int i = lonelyServers.size() - 1; i > 1; i -= checkFactor) {
-			int lowestCapacity = getCapacity(lonelyServers.get(i-(checkFactor-1)));
+		for (int i = 0; i < lonelyServers.size(); i += checkFactor) {
+			int lowestCapacity = getCapacity(lonelyServers.get(i));
 			totalCapacity += lowestCapacity * checkFactor;
 
-			for(int j=i; j > (i-(checkFactor-1)); j--){
-				virtualCapacity.put(lonelyServers.get(i), lowestCapacity);
+			for(int j=i+1; j < (i+checkFactor); j++){
+				virtualCapacity.put(lonelyServers.get(j), lowestCapacity);
+				System.out.println("Map "+getCapacity(lonelyServers.get(j))+" to "+lowestCapacity);
 			}
 			Integer currentValue = countCapacity.get(lowestCapacity);
 			if (currentValue == null)
 				currentValue = 0;
 			countCapacity.put(lowestCapacity, currentValue + checkFactor);
 		}
+		Collections.sort(calculationServers, new CalculationServerComparator("descending"));
 	}
 
 	private void syncCapacity() {
