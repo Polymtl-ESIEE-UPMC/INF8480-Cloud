@@ -46,7 +46,9 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur";
-	private static String mode = "non-securise";
+	private static final double TOLERANCE_REFUSE_RATE = 0.33;
+	private static final int NUMBER_OF_CHECK_REQUIRED = 2;
+	private static String mode = "securise";
 
 	public static void main(String[] args) {
 		String authServerHostName = null;
@@ -73,8 +75,6 @@ public class Repartiteur implements RepartiteurInterface {
 	private TreeMap<Integer, Integer> countCapacity = null;
 	private Map<Integer, Integer> overheads;
 	private Map<Integer, Integer> dangerousOverheads;
-	private List<Future<Response>> resultList = null;
-	private List<Future<Response>> checkResultList = null;
 
 	public Repartiteur(String authServerHostName) {
 		super();
@@ -95,8 +95,6 @@ public class Repartiteur implements RepartiteurInterface {
 		countCapacity = new TreeMap<>();
 		overheads = new HashMap<>();
 		dangerousOverheads = new HashMap<>();
-		resultList = new ArrayList<>();
-		checkResultList = new ArrayList<>();
 	}
 
 	private void run() {
@@ -154,7 +152,6 @@ public class Repartiteur implements RepartiteurInterface {
 			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
 		}
 
-		// creer ThreadPool size = nombre de CalculationServer
 		executorService = Executors.newFixedThreadPool(calculationServers.size());
 	}
 
@@ -215,7 +212,6 @@ public class Repartiteur implements RepartiteurInterface {
 	 * Méthodes accessibles par RMI.
 	 */
 
-	// choisir mode securise || non-securise
 	@Override
 	public int handleOperations(List<String> operations) throws RemoteException {
 		resetTrackingCapacity();
@@ -230,13 +226,12 @@ public class Repartiteur implements RepartiteurInterface {
 
 		case "securise":
 			if (calculationServers.size() > 1) {
-				int checkFactor = 2;
-				CalculationServerInterface idle = detectLonelyServers(checkFactor);
-				updateTrackingCapacity(checkFactor);
-				result = delegateHandleOperationSecurise(list, checkFactor);
+				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
+				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
+				result = delegateHandleOperationSecurise(list, NUMBER_OF_CHECK_REQUIRED);
 
 				if (idle != null)
-					calculationServers.add(idle); // undo modification
+					calculationServers.add(idle); // Undo modification
 
 			} else {
 				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
@@ -268,18 +263,12 @@ public class Repartiteur implements RepartiteurInterface {
 	private int delegateHandleOperationSecurise(List<OperationTodo> list, int checkFactor) {
 
 		clearOverHeads();
-		clearTracking();
-
-		boolean CHECK_WITH_SECOND_SERVER = false;
-		if (checkFactor > 1) {
-			CHECK_WITH_SECOND_SERVER = true;
-		}
 
 		List<OperationTodo> remainingList = new ArrayList<>();
 
 		if (list.size() > totalCapacity) {
 			double averageRefusePercent = (double) (list.size() - totalCapacity) / (4 * totalCapacity / checkFactor);
-			while (averageRefusePercent > 0.33) {
+			while (averageRefusePercent > TOLERANCE_REFUSE_RATE) {
 				OperationTodo remain = list.get(list.size() - 1);
 				remainingList.add(remain);
 				list.remove(remain);
@@ -289,19 +278,23 @@ public class Repartiteur implements RepartiteurInterface {
 			calculateOverheadForEach(averageRefusePercent);
 		}
 
-		assignTasks(list, checkFactor);
+		List<Future<Response>> resultList = new ArrayList<>();
 
-		int temp = getResult(CHECK_WITH_SECOND_SERVER, checkFactor);
+		List<Future<Response>> checkResultList = assignTasks(list, checkFactor, resultList);
+
+		int temp = checkResultList != null ? 
+					getResult(resultList, checkResultList, remainingList) : getResult(resultList);
 		if (remainingList.size() > 0) {
 			return temp + delegateHandleOperationSecurise(remainingList, checkFactor);
 		}
 		return temp;
 	}
 
-	private int assignTasks(List<OperationTodo> list, int checkFactor) {
+	private List<Future<Response>> assignTasks(List<OperationTodo> list, int checkFactor, List<Future<Response>> resultList) {
 
 		int from = 0;
 		int i = 0;
+		List<Future<Response>> checkResultList = checkFactor > 1 ? new ArrayList<>() : null;
 
 		while (i < calculationServers.size()) {
 			int csCapacity = getCapacity(calculationServers.get(i));
@@ -323,19 +316,21 @@ public class Repartiteur implements RepartiteurInterface {
 
 			List<OperationTodo> todo = new ArrayList<>(list.subList(from, to));
 
-			sendTask(todo, calculationServers.get(i));
-			if (i != i + checkFactor - 1) {
-				sendTask(todo, calculationServers.get(i + checkFactor - 1), checkResultList);
+			sendTask(todo, calculationServers.get(i), resultList);
+			if (checkResultList != null) {
+				checkResultList.addAll(sendTestTask(todo, i, checkFactor));
 			}
 			i += checkFactor;
 
 			from = to;
 		}
-		return from;
+		return checkResultList;
 	}
 
-	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs) {
-		sendTask(todos, cs, resultList);
+	private List<Future<Response>> sendTestTask(List<OperationTodo> todo, int i, int checkFactor){
+		List<Future<Response>> checkResultList = new ArrayList<>();
+		sendTask(todo, calculationServers.get(i + checkFactor - 1), checkResultList);
+		return checkResultList;
 	}
 
 	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs,
@@ -359,9 +354,13 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
-	private int getResult(boolean check, int checkFactor) {
+	private int getResult(List<Future<Response>> resultList){
+		return getResult(resultList, null, null);
+	}
+
+	private int getResult(List<Future<Response>> resultList, List<Future<Response>> checkResultList, List<OperationTodo> remainingList) {
 		int res = 0;
-		List<OperationTodo> redo = new ArrayList<>();
+		boolean check = checkResultList != null ? true : false;
 		for (int i = 0; i < resultList.size(); i++) {
 			try {
 				if (!check) {
@@ -373,18 +372,7 @@ public class Repartiteur implements RepartiteurInterface {
 					if (temp == checkResponse.res) {
 						res = (res + temp) % 4000;
 					} else {
-						// System.out.println("res "+response.res);
-						// for(OperationTodo op : response.operations){
-						// 	System.out.print(op.name+" "+op.parameter+" / ");
-						// }
-						// System.out.println("");
-						// System.out.println("check "+checkResponse.res);
-						// for(OperationTodo op : checkResponse.operations){
-						// 	System.out.print(op.name+" "+op.parameter+" / ");
-						// }
-						// System.out.println("");
-						// Thread.sleep(5000);
-						redo.addAll(response.operations);
+						remainingList.addAll(response.operations);
 					}
 				}
 			} catch (ExecutionException e) {
@@ -393,7 +381,6 @@ public class Repartiteur implements RepartiteurInterface {
 				e.printStackTrace();
 			}
 		}
-		if(redo.size() > 0) return res + delegateHandleOperationSecurise(redo, checkFactor);
 		return res;
 	}
 
@@ -468,15 +455,15 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
-		/**
-		 * EXTENDABLE FOR MULTIPLE CHECK
-		 */
+
 		Collections.sort(lonelyServers, new CalculationServerComparator());
 		for (int i = lonelyServers.size() - 1; i > 1; i -= checkFactor) {
-			int lowestCapacity = getCapacity(lonelyServers.get(i - (checkFactor - 1)));
+			int lowestCapacity = getCapacity(lonelyServers.get(i-(checkFactor-1)));
 			totalCapacity += lowestCapacity * checkFactor;
 
-			virtualCapacity.put(lonelyServers.get(i), lowestCapacity);
+			for(int j=i; j > (i-(checkFactor-1)); j--){
+				virtualCapacity.put(lonelyServers.get(i), lowestCapacity);
+			}
 			Integer currentValue = countCapacity.get(lowestCapacity);
 			if (currentValue == null)
 				currentValue = 0;
@@ -513,11 +500,6 @@ public class Repartiteur implements RepartiteurInterface {
 	private void clearOverHeads() {
 		overheads.clear();
 		dangerousOverheads.clear();
-	}
-
-	private void clearTracking() {
-		resultList.clear();
-		checkResultList.clear();
 	}
 
 	private void resetTrackingCapacity() {
