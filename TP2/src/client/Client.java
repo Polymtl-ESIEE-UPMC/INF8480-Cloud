@@ -107,7 +107,9 @@ public class Client {
 					return;
 				}
 				List<String> operations = readAllText(filePath);
-				int reponse = repartiteur.handleOperations(operations);
+				//int reponse = repartiteur.handleOperations(operations);
+				String mode = "securise";
+				int reponse = repartiteur.handleOperations(operations, mode);
 				System.out.println(reponse);
 			} catch (RemoteException e) {
 				System.err.println("Erreur: " + e.getMessage());
