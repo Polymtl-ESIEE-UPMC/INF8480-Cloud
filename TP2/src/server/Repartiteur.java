@@ -290,6 +290,7 @@ public class Repartiteur implements RepartiteurInterface {
 			7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette liste comme param
 		*/
 			System.out.println("MODE: "+mode);
+			System.out.println("BEGIN ===============================================");
 			if (calculationServers.size() > 1) {
 				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
 				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
@@ -306,6 +307,8 @@ public class Repartiteur implements RepartiteurInterface {
 				System.out.println("Switch au mode non-securise automatiquement");
 				finalResult = delegateHandleOperationNonSecurise(list);
 			}
+			System.out.println("FINISH ===============================================");
+			System.out.println("");
 			break;
 
 		default:
