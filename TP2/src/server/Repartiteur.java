@@ -46,6 +46,7 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur";
+	private static String mode = "non-securise";
 
 	public static void main(String[] args) {
 		String authServerHostName = null;
@@ -214,26 +215,9 @@ public class Repartiteur implements RepartiteurInterface {
 	 * Méthodes accessibles par RMI.
 	 */
 
-	@Override
-	public int handleOperations(List<String> operations) throws RemoteException {
-		List<OperationTodo> list = new ArrayList<>();
-		for (String op : operations) {
-			String[] algo = op.split(" ");
-			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
-		}
-
-		// TODO: Faire un bon algorithme
-		int result = 0;
-		for (int i = 0; i < list.size(); i++) {
-			List<OperationTodo> task = new ArrayList<OperationTodo>(list.subList(i, i + 1));
-			result = (result + calculationServers.get(i % 2).calculateOperations(task)) % 4000;
-		}
-		return result;
-	}
-
 	// choisir mode securise || non-securise
 	@Override
-	public int handleOperations(List<String> operations, String mode) throws RemoteException {
+	public int handleOperations(List<String> operations) throws RemoteException {
 		resetTrackingCapacity();
 
 		List<OperationTodo> list = parseStringToOperations(operations);
@@ -264,8 +248,6 @@ public class Repartiteur implements RepartiteurInterface {
 		default:
 			throw new RemoteException("Erreur: mode non reconnu");
 		}
-		clearOverHeads();
-		clearTracking();
 
 		return (int) result%4000;
 	}
