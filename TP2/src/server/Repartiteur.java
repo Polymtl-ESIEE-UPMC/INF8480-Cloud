@@ -64,9 +64,30 @@ public class Repartiteur implements RepartiteurInterface {
 
 	public static void main(String[] args) {
 		String authServerHostName = null;
-		if (args.length > 0) {
-			authServerHostName = args[0];
+		// if (args.length > 0) {
+		// 	authServerHostName = args[0];
+		// }
+		for (int i = 0; i < args.length; i++) {
+			try {
+				switch (args[i]) {
+				case "-a":
+					authServerHostName = args[++i];
+					break;
+				case "-s":
+					String answ = args[++i];
+					if(answ.equals("n")){
+						mode = "non-securise";
+					}
+					break;
+				default:
+					break;
+				}
+			} catch (IndexOutOfBoundsException e) {
+				System.err.println("Paramètres invalides");
+				return;
+			}
 		}
+		System.out.println("MODE: "+mode);
 		Repartiteur server = new Repartiteur(authServerHostName);
 		server.run();
 	}
@@ -228,13 +249,15 @@ public class Repartiteur implements RepartiteurInterface {
 	public int handleOperations(List<String> operations) throws RemoteException {
 		resetTrackingCapacity();
 
-		System.out.println("Default total capacity: "+defaultTotalCapacity);
-
 		List<OperationTodo> list = parseStringToOperations(operations);
 		int finalResult = 0;
 
+		System.out.println("BEGIN ===============================================");
 		switch (mode) {
 		case "non-securise":
+		/*
+		*	Le mode non-securise consiste les etapes 4 5 7 de l'algo securise
+		*/
 			finalResult = delegateHandleOperationNonSecurise(list);
 			break;
 
@@ -289,8 +312,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 			7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette liste comme param
 		*/
-			System.out.println("MODE: "+mode);
-			System.out.println("BEGIN ===============================================");
+			
 			if (calculationServers.size() > 1) {
 				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
 				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
@@ -307,13 +329,13 @@ public class Repartiteur implements RepartiteurInterface {
 				System.out.println("Switch au mode non-securise automatiquement");
 				finalResult = delegateHandleOperationNonSecurise(list);
 			}
-			System.out.println("FINISH ===============================================");
-			System.out.println("");
 			break;
 
 		default:
 			throw new RemoteException("Erreur: mode non reconnu");
 		}
+		System.out.println("FINISH ===============================================");
+		System.out.println("");
 
 		return (int) finalResult%4000;
 	}
