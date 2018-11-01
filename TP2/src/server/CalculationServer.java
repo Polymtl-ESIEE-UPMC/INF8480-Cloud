@@ -106,22 +106,22 @@ public class CalculationServer implements CalculationServerInterface {
 
 			registry.rebind("calculationServer", stub);
 			System.out.println("Calculation server ready.");
+		
+			CalculationServerInfo info = new CalculationServerInfo("", this.port, capacity);
+			try {
+				boolean success = authServer.registerCalculationServer(info);
+				if (!success) {
+					System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
+				}
+			} catch (RemoteException e) {
+				System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
+				System.err.println("Erreur: " + e.getMessage());
+			}
 		} catch (ConnectException e) {
 			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
 		} catch (Exception e) {
-			System.err.println("Erreur: " + e.getMessage());
-		}
-
-		CalculationServerInfo info = new CalculationServerInfo("", this.port, capacity);
-		try {
-			boolean success = authServer.registerCalculationServer(info);
-			if (!success) {
-				System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
-			}
-		} catch (RemoteException e) {
-			System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
 			System.err.println("Erreur: " + e.getMessage());
 		}
 	}
