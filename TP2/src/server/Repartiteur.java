@@ -70,7 +70,7 @@ public class Repartiteur implements RepartiteurInterface {
 		for (int i = 0; i < args.length; i++) {
 			try {
 				switch (args[i]) {
-				case "-a":
+				case "-i":
 					authServerHostName = args[++i];
 					break;
 				case "-s":
@@ -133,8 +133,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private void run() {
 
 		try {
-			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 0);
-			Registry registry = LocateRegistry.getRegistry();
+			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 5005);
+			Registry registry = LocateRegistry.createRegistry(5005);
 
 			registry.rebind("repartiteur", stub);
 			System.out.println("Repartiteur ready.");

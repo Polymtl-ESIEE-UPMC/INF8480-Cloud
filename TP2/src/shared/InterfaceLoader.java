@@ -13,7 +13,7 @@ public class InterfaceLoader {
 		AuthServerInterface stub = null;
 
 		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
+			Registry registry = LocateRegistry.getRegistry(hostname, 5000);
 			stub = (AuthServerInterface) registry.lookup("authServer");
 		} catch (NotBoundException e) {
 			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");
@@ -31,7 +31,7 @@ public class InterfaceLoader {
 		RepartiteurInterface stub = null;
 
 		try {
-			Registry registry = LocateRegistry.getRegistry(hostname);
+			Registry registry = LocateRegistry.getRegistry(hostname, 5005);
 			stub = (RepartiteurInterface) registry.lookup("repartiteur");
 		} catch (NotBoundException e) {
 			System.out.println("Erreur: Le nom '" + e.getMessage() + "' n'est pas défini dans le registre.");

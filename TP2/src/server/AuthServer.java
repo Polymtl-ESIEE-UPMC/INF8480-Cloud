@@ -53,9 +53,9 @@ public class AuthServer implements AuthServerInterface {
 	private void run() {
 		try {
 			AuthServerInterface stub = (AuthServerInterface) UnicastRemoteObject
-					.exportObject(this, 0);
+					.exportObject(this, 5000);
 
-			Registry registry = LocateRegistry.getRegistry();
+			Registry registry = LocateRegistry.createRegistry(5000);
 			registry.rebind("authServer", stub);
 			System.out.println("Server ready.");
 		} catch (ConnectException e) {
