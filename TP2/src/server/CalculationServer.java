@@ -148,6 +148,8 @@ public class CalculationServer implements CalculationServerInterface {
 			return -1;
 		}
 
+		//TODO : ajouter verifyRepartiteur
+
 		System.out.println("Handling " + operations.size() + " operations.");
 		float randF = random.nextFloat();
 
