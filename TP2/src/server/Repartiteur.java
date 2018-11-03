@@ -60,13 +60,11 @@ public class Repartiteur implements RepartiteurInterface {
 	private static final String CREDENTIALS_FILENAME = "credentialsRepartiteur";
 	private static final double TOLERANCE_REFUSE_RATE = 0.33;
 	private static final int NUMBER_OF_CHECK_REQUIRED = 2;
-	private static String mode = "securise";
+	private static String mode = "non-securise";
 
 	public static void main(String[] args) {
 		String authServerHostName = null;
-		// if (args.length > 0) {
-		// 	authServerHostName = args[0];
-		// }
+
 		for (int i = 0; i < args.length; i++) {
 			try {
 				switch (args[i]) {
@@ -74,22 +72,25 @@ public class Repartiteur implements RepartiteurInterface {
 					authServerHostName = args[++i];
 					break;
 				case "-s":
-					String answ = args[++i];
-					if(answ.equals("n")){
-						mode = "non-securise";
-					}
+					mode = "securise";
 					break;
 				default:
 					break;
 				}
 			} catch (IndexOutOfBoundsException e) {
 				System.err.println("Paramètres invalides");
+				printHelp();
 				return;
 			}
 		}
-		System.out.println("MODE: "+mode);
+
 		Repartiteur server = new Repartiteur(authServerHostName);
 		server.run();
+	}
+
+	// Affiche l'aide sur les commandes
+	public static void printHelp() {
+		System.out.println("Le mode non-sécurisé est le mode par défaut\nListe des commandes :\n" + "-i ip_adress\n-s : sécurisé");
 	}
 
 	private AuthServerInterface authServer = null;
@@ -131,39 +132,29 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void run() {
-
 		try {
 			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 5005);
 			Registry registry = LocateRegistry.createRegistry(5005);
 
 			registry.rebind("repartiteur", stub);
-			System.out.println("Repartiteur ready.");
-		} catch (ConnectException e) {
-			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
-			System.err.println();
-			System.err.println("Erreur: " + e.getMessage());
-		} catch (Exception e) {
-			System.err.println("Erreur: " + e.getMessage());
-		}
 
-		checkExistingRepartiteur();
+			if(authServer == null){
+				return;
+			}
 
-		if (account.userName == null || account.password == null) {
-			System.err.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
-			return;
-		}
+			checkExistingRepartiteur();
 
-		try {
+			if (account.userName == null || account.password == null) {
+				System.err.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
+				return;
+			}
+
 			boolean success = authServer.loginRepartiteur(account);
 			if (!success) {
 				System.err.println("Erreur lors du login du répartiteur :");
 				return;
 			}
-		} catch (RemoteException e) {
-			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
-		}
 
-		try {
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
 				System.out.println(sd);
 				CalculationServerInterface cs = InterfaceLoader.loadCalculationServer(sd.ip, sd.port);
@@ -181,11 +172,19 @@ public class Repartiteur implements RepartiteurInterface {
 				overheads.put(lastCScapacity, 0);
 				dangerousOverheads.put(lastCScapacity, 0);
 			}
+			
+			executorService = Executors.newFixedThreadPool(calculationServers.size());
+
+			System.out.println("Repartiteur ready. MODE: " + mode);
+		} catch (ConnectException e) {
+			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
+			System.err.println();
+			System.err.println("Erreur: " + e.getMessage());
 		} catch (RemoteException e) {
 			System.err.println("Erreur lors de la récupération des serveurs de calcul :\n" + e.getMessage());
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-
-		executorService = Executors.newFixedThreadPool(calculationServers.size());
 	}
 
 	/**
