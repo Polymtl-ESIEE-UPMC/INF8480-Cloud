@@ -1,21 +1,10 @@
 package server;
 
-import java.rmi.AccessException;
 import java.rmi.ConnectException;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.rmi.server.ServerNotActiveException;
 import java.rmi.server.UnicastRemoteObject;
-import shared.AuthServerInterface;
-import shared.CalculationServerInfo;
-import shared.CalculationServerInterface;
-import shared.InterfaceLoader;
-import shared.OperationTodo;
-import shared.RepartiteurInterface;
-import shared.Response;
-import shared.Account;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -35,6 +24,15 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+
+import shared.AuthServerInterface;
+import shared.CalculationServerInfo;
+import shared.CalculationServerInterface;
+import shared.InterfaceLoader;
+import shared.OperationTodo;
+import shared.RepartiteurInterface;
+import shared.Response;
+import shared.Account;
 
 public class Repartiteur implements RepartiteurInterface {
 
