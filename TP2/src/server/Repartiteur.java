@@ -29,6 +29,7 @@ import shared.AuthServerInterface;
 import shared.CalculationServerInfo;
 import shared.CalculationServerInterface;
 import shared.InterfaceLoader;
+import shared.OperationRefusedException;
 import shared.OperationTodo;
 import shared.PortsSettings;
 import shared.RepartiteurInterface;
@@ -74,6 +75,7 @@ public class Repartiteur implements RepartiteurInterface {
 					mode = "securise";
 					break;
 				default:
+					System.err.println("Paramètre inconnu et ignoré : " + args[i]);
 					break;
 				}
 			} catch (IndexOutOfBoundsException e) {
@@ -131,18 +133,18 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void run() {
+		if (authServer == null) {
+			return;
+		}
+		
 		try {
 			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, PortsSettings.repartiteurPort);
 			Registry registry = LocateRegistry.createRegistry(PortsSettings.repartiteurPort);
-
+			
 			registry.rebind("repartiteur", stub);
-
-			if (authServer == null) {
-				return;
-			}
-
+			
 			checkExistingRepartiteur();
-
+			
 			if (account.userName == null || account.password == null) {
 				System.err.println("Le fichier d'informations du répartiteur n'a pas le format attendu.");
 				return;
@@ -150,33 +152,35 @@ public class Repartiteur implements RepartiteurInterface {
 
 			boolean success = authServer.loginRepartiteur(account);
 			if (!success) {
-				System.err.println("Erreur lors du login du répartiteur :");
+				System.err.println("Erreur lors du login du répartiteur.");
 				return;
 			}
 
+			System.out.println("Serveurs disponibles : ");
 			for (CalculationServerInfo sd : authServer.getCalculationServers()) {
-				System.out.println(sd);
 				CalculationServerInterface cs = InterfaceLoader.loadCalculationServer(sd.ip, sd.port);
+				
+				if(cs == null)
+					continue;
+				
+				System.out.println(sd);
+
 				calculationServers.add(cs);
 
+				defaultTotalCapacity += sd.capacity;
+				
 				cacheCapacity.put(cs, sd.capacity);
-				int lastCScapacity = sd.capacity;
-				defaultTotalCapacity += lastCScapacity;
-				Integer currentValue = cacheCountCapacity.get(lastCScapacity);
-				if (currentValue == null) {
-					cacheCountCapacity.put(lastCScapacity, 1);
-				} else {
-					cacheCountCapacity.put(lastCScapacity, currentValue + 1);
-				}
-				overheads.put(lastCScapacity, 0);
-				dangerousOverheads.put(lastCScapacity, 0);
+				cacheCountCapacity.merge(sd.capacity, 1, Integer::sum);
+
+				overheads.put(sd.capacity, 0);
+				dangerousOverheads.put(sd.capacity, 0);
 			}
 
 			executorService = Executors.newFixedThreadPool(calculationServers.size());
 
 			System.out.println("Repartiteur ready. MODE: " + mode);
 		} catch (ConnectException e) {
-			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
+			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
 		} catch (RemoteException e) {
@@ -195,8 +199,8 @@ public class Repartiteur implements RepartiteurInterface {
 			BufferedReader fileReader = new BufferedReader(new FileReader(CREDENTIALS_FILENAME));
 			try {
 				String login = fileReader.readLine();
-				String passwordword = fileReader.readLine();
-				account = new Account(login, passwordword);
+				String password = fileReader.readLine();
+				account = new Account(login, password);
 			} catch (IOException e) {
 				System.err.println(e.getMessage());
 			} finally {
@@ -232,8 +236,7 @@ public class Repartiteur implements RepartiteurInterface {
 				System.out.println("Ce nom d'utilisateur n'est pas disponible, veuillez recommencer.");
 			}
 		} catch (RemoteException err) {
-			System.err.println(
-					"Erreur liée à la connexion au serveur. Abandon de la tentative de création de compte répartiteur.");
+			System.err.println("Erreur liée à la connexion au serveur. Abandon de la tentative de création de compte répartiteur.");
 		}
 
 		reader.close();
@@ -252,92 +255,90 @@ public class Repartiteur implements RepartiteurInterface {
 
 		System.out.println("BEGIN ===============================================");
 		switch (mode) {
-		case "non-securise":
-			/*
-			 * Le mode non-securise consiste les etapes 4 5 7 de l'algo securise
-			 */
-			finalResult = delegateHandleOperationNonSecurise(list);
-			break;
+			case "securise":
+				/*
+				* Le mode securise consiste les etapes 4 5 7 de l'algo non-securise
+				*/
+				finalResult = delegateHandleOperationSecurise(list);
+				break;
 
-		case "securise":
+			case "non-securise":
 
-			/*
-			 * Algorithm de repartiteur mode securise
-			 * 
-			 * !!! REMARQUE: Algorithm est extendable pour le test entre 3...n serveurs en
-			 * Overriding la fonction checkMalicious pour comparer plus de 2 resultats a
-			 * chaque fois de maniere prefere, le reste est gere automatiquement
-			 * 
-			 * Il y a globalement 7 etapes: (le mot server calculation et serveur sont
-			 * interchangeable) 1. Detecter les serveurs lonely 2. Isoler un serveur si le
-			 * nombre total est impair 3. Map les serveurs lonely au partner de capacity la
-			 * plus petite 4. Traiter les overheads ou prendre une partie des operations si
-			 * necessaire <------- 5. Donner les operations aux servers | 6. Recuperer le
-			 * resultat et mettre a cote les operations non valide | 7. Si il reste des
-			 * operations, revenir au 4e -----------------------------------------
-			 * 
-			 * Le detail de chaque etape: 1. Detecter les serveurs qui n'ont pas de
-			 * partenaire de meme capacite e.g. Si on veut tester le resultat entre 2
-			 * serveur, et il existe 3 serveurs de capacite 4 la 3e est un serveur "lonely"
-			 * 
-			 * 2. Si le nombre total des serveurs sont impair, il y aura surement un serveur
-			 * qui n'aura pas de partenaire, meme si avec une capacite different, on cherche
-			 * alors a isoler ce serveur pour ce calcul, on isole alors le serveur la
-			 * capacite la plus petite parmi les lonely
-			 * 
-			 * 3. Comme on va comparer le resultat de 2 serveurs, ces 2 serveurs devraient
-			 * faire les memes operations, donc leur capacite doit etre egal. Car en 4e
-			 * etape, on va calculer le nombre des operations maximal pour chaque serveur
-			 * pour que le taux de refus ne soit pas trop eleve. Donc ici on cherche a
-			 * "mapper" (i.e. remplacer) la capacite du serveur lonely par la capacite de
-			 * sont partenaire qui est plus peite, cad on donne les operations pour que le
-			 * taux de refus tf = min(tf1, tf2).
-			 * 
-			 * 4. On decide le nombre des operations de trop pour chaque serveur en fonction
-			 * de sa capacite On a le taux de refus moyen tfm = (Nbre operations -
-			 * totalCapacity/2) / (4 * totalCapacity/2) (comme 2 servers fait la meme chose
-			 * a chaque fois, donc la capacite /2) D'abord on veut que le tfm < SEUIL, si
-			 * tfm > SEUIL, on mettre quelque operation dans une liste a cote pour faire
-			 * plus tard (remaining) et recalcule tfm Une fois qu'on a la liste a faire des
-			 * operatoins, on calcule le nombre d'operation pour chaque Comme on veut tfm =
-			 * tf1 = tf2 = ... = tfn le Nbre d'operation de trop (overhead) = tfm * 4 *
-			 * capacite Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une
-			 * somme "dangerous" pour redistribuer plus tard
-			 * 
-			 * 5. Nbre d'operation = capcite + overhead + dangerous
-			 * 
-			 * 6. On recupere et test le resultat, si ce n'est pas valide on rajoute a la
-			 * liste remaining
-			 * 
-			 * 7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette
-			 * liste comme param
-			 */
+				/*
+				*	Algorithm de repartiteur mode non-securise
 
-			if (calculationServers.size() > 1) {
-				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
-				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
+				!!! REMARQUE: Algorithm est extendable pour le test entre 3...n serveurs en Overriding 
+				la fonction checkMalicious pour comparer plus de 2 resultats a chaque fois de maniere 
+				prefere, le reste est gere automatiquement
 
-				System.out.println("Current total capacity: " + totalCapacity);
+				Il y a globalement 7 etapes: (le mot server calculation et serveur sont interchangeable)
+					1. Detecter les serveurs lonely
+					2. Isoler un serveur si le nombre total est impair
+					3. Map les serveurs lonely au partner de capacity la plus petite
+					4. Traiter les overheads ou prendre une partie des operations si necessaire		<-------
+					5. Donner les operations aux servers													|
+					6. Recuperer le resultat et mettre a cote les operations non valide						|
+					7. Si il reste des operations, revenir au 4e	-----------------------------------------
 
-				finalResult = delegateHandleOperationSecurise(list, NUMBER_OF_CHECK_REQUIRED);
+				Le detail de chaque etape:
+					1. Detecter les serveurs qui n'ont pas de partenaire de meme capacite
+					e.g. Si on veut tester le resultat entre 2 serveur, et il existe 3 serveurs de capacite 4
+					la 3e est un serveur "lonely"
+					
+					2. Si le nombre total des serveurs sont impair, il y aura surement un serveur qui n'aura pas
+					de partenaire, meme si avec une capacite different, on cherche alors a isoler ce serveur pour
+					ce calcul, on isole alors le serveur la capacite la plus petite parmi les lonely
 
-				if (idle != null)
-					calculationServers.add(idle); // Undo modification
+					3. Comme on va comparer le resultat de 2 serveurs, ces 2 serveurs devraient faire les memes
+					operations, donc leur capacite doit etre egal. Car en 4e etape, on va calculer le nombre des
+					operations maximal pour chaque serveur pour que le taux de refus ne soit pas trop eleve. Donc
+					ici on cherche a "mapper" (i.e. remplacer) la capacite du serveur lonely par la capacite de
+					sont partenaire qui est plus peite, cad on donne les operations pour que le taux de refus 
+					tf = min(tf1, tf2).
+						
+					4. On decide le nombre des operations de trop pour chaque serveur en fonction de sa capacite
+					On a le taux de refus moyen tfm = (Nbre operations - totalCapacity/2) / (4 * totalCapacity/2)
+					(comme 2 servers fait la meme chose a chaque fois, donc la capacite /2)
+					D'abord on veut que le tfm < SEUIL, si tfm > SEUIL, on mettre quelque operation dans une liste
+					a cote pour faire plus tard (remaining) et recalcule tfm
+					Une fois qu'on a la liste a faire des operatoins, on calcule le nombre d'operation pour chaque
+					Comme on veut tfm = tf1 = tf2 = ... = tfn
+					le Nbre d'operation de trop (overhead) = tfm * 4 * capacite
+					Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une somme "dangerous" pour 
+					redistribuer plus tard
 
-			} else {
-				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
-				System.out.println("Switch au mode non-securise automatiquement");
-				finalResult = delegateHandleOperationNonSecurise(list);
-			}
-			break;
+					5. Nbre d'operation = capcite + overhead + dangerous
 
-		default:
-			throw new RemoteException("Erreur: mode non reconnu");
+					6. On recupere et test le resultat, si ce n'est pas valide on rajoute a la liste remaining
+
+					7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette liste comme param
+				*/
+
+				if (calculationServers.size() > 1) {
+					CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
+					updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
+
+					System.out.println("Current total capacity: " + totalCapacity);
+
+					finalResult = delegateHandleOperationNonSecurise(list, NUMBER_OF_CHECK_REQUIRED);
+
+					if (idle != null)
+						calculationServers.add(idle); // Undo modification
+
+				} else {
+					System.out.println("Il n'y a pas suffisamment de serveur de calcul");
+					System.out.println("Switch au mode securise automatiquement");
+					finalResult = delegateHandleOperationSecurise(list);
+				}
+				break;
+
+			default:
+				throw new RemoteException("Erreur: mode non reconnu");
 		}
 		System.out.println("FINISH ===============================================");
 		System.out.println("");
 
-		return (int) finalResult % 4000;
+		return finalResult % 4000;
 	}
 
 	private List<OperationTodo> parseStringToOperations(List<String> operations) {
@@ -349,11 +350,11 @@ public class Repartiteur implements RepartiteurInterface {
 		return list;
 	}
 
-	private int delegateHandleOperationNonSecurise(List<OperationTodo> list) {
-		return delegateHandleOperationSecurise(list, 1);
+	private int delegateHandleOperationSecurise(List<OperationTodo> list) {
+		return delegateHandleOperationNonSecurise(list, 1);
 	}
 
-	private int delegateHandleOperationSecurise(List<OperationTodo> list, int checkFactor) {
+	private int delegateHandleOperationNonSecurise(List<OperationTodo> list, int checkFactor) {
 
 		clearOverHeads();
 
@@ -377,7 +378,7 @@ public class Repartiteur implements RepartiteurInterface {
 		int temp = getResult(globalResultList, remainingList);
 		if (remainingList.size() > 0) {
 			System.out.println("7. Si il reste des operations, revenir au 4e");
-			return temp + delegateHandleOperationSecurise(remainingList, checkFactor);
+			return temp + delegateHandleOperationNonSecurise(remainingList, checkFactor);
 		}
 		return temp;
 	}
@@ -439,15 +440,16 @@ public class Repartiteur implements RepartiteurInterface {
 			customResult.add(executorService.submit(() -> { // lambda Java 8 feature
 				int res = 0;
 
-				do {
-					try {
-						res = cs.calculateOperations(todos);
-					} catch (RemoteException e) {
-
-						e.printStackTrace();
-					}
-				} while (res == -1);
-
+				try {
+					do {
+						res = cs.calculateOperations(todos, account);
+					} while(res == -1);
+				} catch (RemoteException e) {
+					e.printStackTrace();
+				} catch (OperationRefusedException e) {
+					e.printStackTrace();
+				}
+					
 				return new Response(cs, todos, res);
 			}));
 		}
@@ -638,9 +640,7 @@ public class Repartiteur implements RepartiteurInterface {
 			virtualCapacity.put(entry.getKey(), entry.getValue());
 		}
 		countCapacity.clear();
-		for (Map.Entry<Integer, Integer> entry : cacheCountCapacity.entrySet()) {
-			countCapacity.put(entry.getKey(), entry.getValue());
-		}
+		countCapacity.putAll(cacheCountCapacity);
 	}
 
 	private void updateTrackingCapacity(int checkFactor) {
@@ -649,5 +649,4 @@ public class Repartiteur implements RepartiteurInterface {
 			countCapacity.put(entry.getKey(), entry.getValue() / checkFactor);
 		}
 	}
-
 }

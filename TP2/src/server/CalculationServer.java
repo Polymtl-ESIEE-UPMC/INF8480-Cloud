@@ -8,10 +8,12 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
 import java.util.Random;
 
+import shared.Account;
 import shared.AuthServerInterface;
 import shared.CalculationServerInfo;
 import shared.CalculationServerInterface;
 import shared.InterfaceLoader;
+import shared.OperationRefusedException;
 import shared.OperationTodo;
 
 public class CalculationServer implements CalculationServerInterface {
@@ -50,7 +52,7 @@ public class CalculationServer implements CalculationServerInterface {
 			}
 		}
 
-		if(capacity < 1){
+		if (capacity < 1) {
 			System.err.println("La capacité doit être plus grande que 0!");
 			return;
 		}
@@ -97,18 +99,18 @@ public class CalculationServer implements CalculationServerInterface {
 		}
 
 		try {
-			CalculationServerInterface stub; 
+			CalculationServerInterface stub;
 			Registry registry;
-			if(port == 0){
+			if (port == 0) {
 				registry = LocateRegistry.getRegistry();
-			} else{
+			} else {
 				registry = LocateRegistry.createRegistry(this.port);
 			}
 
 			stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, this.port);
-			
+
 			registry.rebind("calculationServer", stub);
-		
+
 			CalculationServerInfo info = new CalculationServerInfo("", this.port, capacity);
 			try {
 				boolean success = authServer.registerCalculationServer(info);
@@ -143,30 +145,36 @@ public class CalculationServer implements CalculationServerInterface {
 	/*
 	 * Méthodes accessibles par RMI. 
 	 */
-	
+
 	@Override
-	public int calculateOperations(List<OperationTodo> operations) throws RemoteException {
-		if(!acceptTask(operations.size())){
-			//opération refusée
+	public int calculateOperations(List<OperationTodo> operations, Account account) throws RemoteException, OperationRefusedException {
+		if (!acceptTask(operations.size())) {
+			// opération refusée
 			System.out.println("refuse");
 			return -1;
 		}
 
-		//TODO : ajouter verifyRepartiteur
+		if (!authServer.verifyRepartiteur(account)) {
+			// opération refusée
+			throw new OperationRefusedException("Votre compte de répartiteur est invalide!");
+		}
 
-		System.out.println("Handling " + operations.size() + " operations.");
+		System.out.println("Traitement de " + operations.size() + " operations.");
 		float randF = random.nextFloat();
 
-		if(badPercent > randF*100){
-			//retourner une valeur malicieuse
-			return random.nextInt(4000);
+		if (badPercent > randF * 100) {
+			// retourner une valeur malicieuse
+			int badValue = random.nextInt(4000);
+			System.out.println("Retour d'une valeur malicieuse : " + badValue);
+			return badValue;
 		}
 
 		int result = 0;
 		for (OperationTodo op : operations) {
 			result = (result + op.execute()) % 4000;
 		}
-		System.out.println(result);
+
+		System.out.println("Résultat : " + result);
 		return result;
 	}
 
