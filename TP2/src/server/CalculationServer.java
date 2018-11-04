@@ -50,6 +50,11 @@ public class CalculationServer implements CalculationServerInterface {
 			}
 		}
 
+		if(capacity < 1){
+			System.err.println("La capacité doit être plus grande que 0!");
+			return;
+		}
+
 		CalculationServer server = new CalculationServer(distantHostname, port, capacity, badPercent);
 		server.run();
 	}
@@ -95,21 +100,22 @@ public class CalculationServer implements CalculationServerInterface {
 			CalculationServerInterface stub; 
 			Registry registry;
 			if(port == 0){
-				stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, 0);
 				registry = LocateRegistry.getRegistry();
 			} else{
-				stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, this.port);
 				registry = LocateRegistry.createRegistry(this.port);
 			}
 
+			stub = (CalculationServerInterface) UnicastRemoteObject.exportObject(this, this.port);
+			
 			registry.rebind("calculationServer", stub);
-			System.out.println("Calculation server ready.");
 		
 			CalculationServerInfo info = new CalculationServerInfo("", this.port, capacity);
 			try {
 				boolean success = authServer.registerCalculationServer(info);
 				if (!success) {
 					System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");
+				} else {
+					System.out.println("Calculation server ready.");
 				}
 			} catch (RemoteException e) {
 				System.err.println("Le serveur de calcul n'a pas pu bien s'enregistrer");

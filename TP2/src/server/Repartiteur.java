@@ -30,6 +30,7 @@ import shared.CalculationServerInfo;
 import shared.CalculationServerInterface;
 import shared.InterfaceLoader;
 import shared.OperationTodo;
+import shared.PortsSettings;
 import shared.RepartiteurInterface;
 import shared.Response;
 import shared.Account;
@@ -37,21 +38,21 @@ import shared.Account;
 public class Repartiteur implements RepartiteurInterface {
 
 	private class CalculationServerComparator implements Comparator<CalculationServerInterface> {
-		private String mode;
+		private boolean ascending;
 
-		public CalculationServerComparator(){
-			mode = "ascending";
+		public CalculationServerComparator() {
+			ascending = true;
 		}
 
-		public CalculationServerComparator(String m){
-			if(m == "descending") mode = m;
-			else System.out.println("ERROR: mode non regconize, ascending par default");
+		public CalculationServerComparator(boolean ascending) {
+			this.ascending = ascending;
 		}
 
 		@Override
 		public int compare(CalculationServerInterface o1, CalculationServerInterface o2) {
-			if(mode == "descending") return Integer.compare(getCapacity(o2), getCapacity(o1));
-			return Integer.compare(getCapacity(o1), getCapacity(o2));
+			if (ascending)
+				return Integer.compare(getCapacity(o1), getCapacity(o2));
+			return Integer.compare(getCapacity(o2), getCapacity(o1));
 		}
 	}
 
@@ -131,12 +132,12 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private void run() {
 		try {
-			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, 5005);
-			Registry registry = LocateRegistry.createRegistry(5005);
+			RepartiteurInterface stub = (RepartiteurInterface) UnicastRemoteObject.exportObject(this, PortsSettings.repartiteurPort);
+			Registry registry = LocateRegistry.createRegistry(PortsSettings.repartiteurPort);
 
 			registry.rebind("repartiteur", stub);
 
-			if(authServer == null){
+			if (authServer == null) {
 				return;
 			}
 
@@ -170,7 +171,7 @@ public class Repartiteur implements RepartiteurInterface {
 				overheads.put(lastCScapacity, 0);
 				dangerousOverheads.put(lastCScapacity, 0);
 			}
-			
+
 			executorService = Executors.newFixedThreadPool(calculationServers.size());
 
 			System.out.println("Repartiteur ready. MODE: " + mode);
@@ -252,69 +253,71 @@ public class Repartiteur implements RepartiteurInterface {
 		System.out.println("BEGIN ===============================================");
 		switch (mode) {
 		case "non-securise":
-		/*
-		*	Le mode non-securise consiste les etapes 4 5 7 de l'algo securise
-		*/
+			/*
+			 * Le mode non-securise consiste les etapes 4 5 7 de l'algo securise
+			 */
 			finalResult = delegateHandleOperationNonSecurise(list);
 			break;
 
 		case "securise":
 
-		/*
-		*	Algorithm de repartiteur mode securise
+			/*
+			 * Algorithm de repartiteur mode securise
+			 * 
+			 * !!! REMARQUE: Algorithm est extendable pour le test entre 3...n serveurs en
+			 * Overriding la fonction checkMalicious pour comparer plus de 2 resultats a
+			 * chaque fois de maniere prefere, le reste est gere automatiquement
+			 * 
+			 * Il y a globalement 7 etapes: (le mot server calculation et serveur sont
+			 * interchangeable) 1. Detecter les serveurs lonely 2. Isoler un serveur si le
+			 * nombre total est impair 3. Map les serveurs lonely au partner de capacity la
+			 * plus petite 4. Traiter les overheads ou prendre une partie des operations si
+			 * necessaire <------- 5. Donner les operations aux servers | 6. Recuperer le
+			 * resultat et mettre a cote les operations non valide | 7. Si il reste des
+			 * operations, revenir au 4e -----------------------------------------
+			 * 
+			 * Le detail de chaque etape: 1. Detecter les serveurs qui n'ont pas de
+			 * partenaire de meme capacite e.g. Si on veut tester le resultat entre 2
+			 * serveur, et il existe 3 serveurs de capacite 4 la 3e est un serveur "lonely"
+			 * 
+			 * 2. Si le nombre total des serveurs sont impair, il y aura surement un serveur
+			 * qui n'aura pas de partenaire, meme si avec une capacite different, on cherche
+			 * alors a isoler ce serveur pour ce calcul, on isole alors le serveur la
+			 * capacite la plus petite parmi les lonely
+			 * 
+			 * 3. Comme on va comparer le resultat de 2 serveurs, ces 2 serveurs devraient
+			 * faire les memes operations, donc leur capacite doit etre egal. Car en 4e
+			 * etape, on va calculer le nombre des operations maximal pour chaque serveur
+			 * pour que le taux de refus ne soit pas trop eleve. Donc ici on cherche a
+			 * "mapper" (i.e. remplacer) la capacite du serveur lonely par la capacite de
+			 * sont partenaire qui est plus peite, cad on donne les operations pour que le
+			 * taux de refus tf = min(tf1, tf2).
+			 * 
+			 * 4. On decide le nombre des operations de trop pour chaque serveur en fonction
+			 * de sa capacite On a le taux de refus moyen tfm = (Nbre operations -
+			 * totalCapacity/2) / (4 * totalCapacity/2) (comme 2 servers fait la meme chose
+			 * a chaque fois, donc la capacite /2) D'abord on veut que le tfm < SEUIL, si
+			 * tfm > SEUIL, on mettre quelque operation dans une liste a cote pour faire
+			 * plus tard (remaining) et recalcule tfm Une fois qu'on a la liste a faire des
+			 * operatoins, on calcule le nombre d'operation pour chaque Comme on veut tfm =
+			 * tf1 = tf2 = ... = tfn le Nbre d'operation de trop (overhead) = tfm * 4 *
+			 * capacite Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une
+			 * somme "dangerous" pour redistribuer plus tard
+			 * 
+			 * 5. Nbre d'operation = capcite + overhead + dangerous
+			 * 
+			 * 6. On recupere et test le resultat, si ce n'est pas valide on rajoute a la
+			 * liste remaining
+			 * 
+			 * 7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette
+			 * liste comme param
+			 */
 
-		!!! REMARQUE: Algorithm est extendable pour le test entre 3...n serveurs en Overriding 
-		la fonction checkMalicious pour comparer plus de 2 resultats a chaque fois de maniere 
-		prefere, le reste est gere automatiquement
-
-		Il y a globalement 7 etapes: (le mot server calculation et serveur sont interchangeable)
-			1. Detecter les serveurs lonely
-			2. Isoler un serveur si le nombre total est impair
-			3. Map les serveurs lonely au partner de capacity la plus petite
-			4. Traiter les overheads ou prendre une partie des operations si necessaire		<-------
-			5. Donner les operations aux servers													|
-			6. Recuperer le resultat et mettre a cote les operations non valide						|
-			7. Si il reste des operations, revenir au 4e	-----------------------------------------
-
-		Le detail de chaque etape:
-			1. Detecter les serveurs qui n'ont pas de partenaire de meme capacite
-			e.g. Si on veut tester le resultat entre 2 serveur, et il existe 3 serveurs de capacite 4
-			la 3e est un serveur "lonely"
-			
-			2. Si le nombre total des serveurs sont impair, il y aura surement un serveur qui n'aura pas
-			de partenaire, meme si avec une capacite different, on cherche alors a isoler ce serveur pour
-			ce calcul, on isole alors le serveur la capacite la plus petite parmi les lonely
-
-			3. Comme on va comparer le resultat de 2 serveurs, ces 2 serveurs devraient faire les memes
-			operations, donc leur capacite doit etre egal. Car en 4e etape, on va calculer le nombre des
-			operations maximal pour chaque serveur pour que le taux de refus ne soit pas trop eleve. Donc
-			ici on cherche a "mapper" (i.e. remplacer) la capacite du serveur lonely par la capacite de
-			sont partenaire qui est plus peite, cad on donne les operations pour que le taux de refus 
-											tf = min(tf1, tf2).
-				
-			4. On decide le nombre des operations de trop pour chaque serveur en fonction de sa capacite
-			On a le taux de refus moyen tfm = (Nbre operations - totalCapacity/2) / (4 * totalCapacity/2)
-			(comme 2 servers fait la meme chose a chaque fois, donc la capacite /2)
-			D'abord on veut que le tfm < SEUIL, si tfm > SEUIL, on mettre quelque operation dans une liste
-			a cote pour faire plus tard (remaining) et recalcule tfm
-			   Une fois qu'on a la liste a faire des operatoins, on calcule le nombre d'operation pour chaque
-			Comme on veut tfm = tf1 = tf2 = ... = tfn
-			le Nbre d'operation de trop (overhead) = tfm * 4 * capacite
-			Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une somme "dangerous" pour 
-			redistribuer plus tard
-
-			5. Nbre d'operation = capcite + overhead + dangerous
-
-			6. On recupere et test le resultat, si ce n'est pas valide on rajoute a la liste remaining
-
-			7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette liste comme param
-		*/
-			
 			if (calculationServers.size() > 1) {
 				CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
 				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
 
-				System.out.println("Current total capacity: "+totalCapacity);
+				System.out.println("Current total capacity: " + totalCapacity);
 
 				finalResult = delegateHandleOperationSecurise(list, NUMBER_OF_CHECK_REQUIRED);
 
@@ -334,7 +337,7 @@ public class Repartiteur implements RepartiteurInterface {
 		System.out.println("FINISH ===============================================");
 		System.out.println("");
 
-		return (int) finalResult%4000;
+		return (int) finalResult % 4000;
 	}
 
 	private List<OperationTodo> parseStringToOperations(List<String> operations) {
@@ -384,14 +387,15 @@ public class Repartiteur implements RepartiteurInterface {
 
 		int from = 0;
 		int i = 0;
-		
+
 		List<List<Future<Response>>> globalResultList = new ArrayList<>();
-		for (int j=0; j<checkFactor; j++){
+		for (int j = 0; j < checkFactor; j++) {
 			globalResultList.add(new ArrayList<>());
 		}
 		List<Future<Response>> resultList = globalResultList.get(0);
 		List<List<Future<Response>>> checkResultList = null;
-		if (globalResultList.size() > 1) checkResultList = globalResultList.subList(1, globalResultList.size());
+		if (globalResultList.size() > 1)
+			checkResultList = globalResultList.subList(1, globalResultList.size());
 
 		while (i < calculationServers.size()) {
 			int csCapacity = getCapacity(calculationServers.get(i));
@@ -416,7 +420,7 @@ public class Repartiteur implements RepartiteurInterface {
 			sendTask(todo, calculationServers.get(i), resultList);
 			if (checkResultList != null) {
 				int j = i;
-				for (List<Future<Response>> checkResult : checkResultList){
+				for (List<Future<Response>> checkResult : checkResultList) {
 					sendTask(todo, calculationServers.get(j + checkFactor - 1), checkResult);
 					j++;
 				}
@@ -431,19 +435,19 @@ public class Repartiteur implements RepartiteurInterface {
 	private void sendTask(List<OperationTodo> todos, CalculationServerInterface cs,
 			List<Future<Response>> customResult) {
 
-		if(todos.size() > 0){
+		if (todos.size() > 0) {
 			customResult.add(executorService.submit(() -> { // lambda Java 8 feature
 				int res = 0;
-	
+
 				do {
 					try {
 						res = cs.calculateOperations(todos);
 					} catch (RemoteException e) {
-	
+
 						e.printStackTrace();
 					}
 				} while (res == -1);
-	
+
 				return new Response(cs, todos, res);
 			}));
 		}
@@ -453,7 +457,8 @@ public class Repartiteur implements RepartiteurInterface {
 		int res = 0;
 		List<Future<Response>> result = globalResultList.get(0);
 		boolean check = globalResultList.size() == 1 ? false : true;
-		if(check) System.out.println("6. Recuperer le resultat et mettre a cote les operations non valide");
+		if (check)
+			System.out.println("6. Recuperer le resultat et mettre a cote les operations non valide");
 		for (int i = 0; i < result.size(); i++) {
 			try {
 				if (!check) {
@@ -477,10 +482,11 @@ public class Repartiteur implements RepartiteurInterface {
 		return res;
 	}
 
-	private boolean checkMalicious(int res, List<List<Future<Response>>> checkResultList, int index){
+	private boolean checkMalicious(int res, List<List<Future<Response>>> checkResultList, int index) {
 		List<Future<Response>> checkResult = checkResultList.get(0);
-		try{
-			if(res == checkResult.get(index).get().res) return true;
+		try {
+			if (res == checkResult.get(index).get().res)
+				return true;
 		} catch (ExecutionException e) {
 			e.printStackTrace();
 			return false;
@@ -545,11 +551,9 @@ public class Repartiteur implements RepartiteurInterface {
 			}
 		}
 
-		//*************************************************************** */
-
 		// 2. Isoler un serveur si le nombre total est impair
 		CalculationServerInterface idle = isolateIdleServerIfThereIs(lonelyServers, checkFactor);
-		// 3. Map les serveurs lonely au partner de capacity la plus petite		
+		// 3. Map les serveurs lonely au partner de capacity la plus petite
 		mapLonelyServerToLowestPartner(lonelyServers, checkFactor);
 
 		return idle;
@@ -579,9 +583,9 @@ public class Repartiteur implements RepartiteurInterface {
 			int lowestCapacity = getCapacity(lonelyServers.get(i));
 			totalCapacity += lowestCapacity * checkFactor;
 
-			for(int j=i+1; j < (i+checkFactor); j++){
+			for (int j = i + 1; j < (i + checkFactor); j++) {
 				virtualCapacity.put(lonelyServers.get(j), lowestCapacity);
-				System.out.println("Map "+getCapacity(lonelyServers.get(j))+" to "+lowestCapacity);
+				System.out.println("Map " + getCapacity(lonelyServers.get(j)) + " to " + lowestCapacity);
 			}
 			Integer currentValue = countCapacity.get(lowestCapacity);
 			if (currentValue == null)
@@ -589,7 +593,7 @@ public class Repartiteur implements RepartiteurInterface {
 			countCapacity.put(lowestCapacity, currentValue + checkFactor);
 		}
 		// Sort descending pour donner les operations aux servers de gros capacite first
-		Collections.sort(calculationServers, new CalculationServerComparator("descending"));
+		Collections.sort(calculationServers, new CalculationServerComparator(false));
 	}
 
 	private void syncCapacity() {
