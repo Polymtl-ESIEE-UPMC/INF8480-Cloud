@@ -106,8 +106,11 @@ public class Client {
 
 				//S'il n'y pas eu de problème de lecture
 				if (operations.size() > 0) {
-					int reponse = repartiteur.handleOperations(operations);
-					System.out.println("Réponse du répartiteur : " + reponse);
+					long startTime = System.currentTimeMillis();
+					int response = repartiteur.handleOperations(operations);
+					long elapsedTime = System.currentTimeMillis() - startTime;
+					System.out.println("Réponse du répartiteur : " + response);
+					System.out.println("Temps : " + elapsedTime + "ms");
 				}
 			} catch (RemoteException e) {
 				System.err.println("Erreur: " + e.getMessage());
