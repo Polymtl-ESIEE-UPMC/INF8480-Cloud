@@ -94,8 +94,6 @@ public class Client {
 		}
 	}
 
-
-
 	private void run(String filePath) {
 		if (repartiteur != null && authServer != null) {
 			try {
@@ -105,9 +103,11 @@ public class Client {
 					return;
 				}
 				List<String> operations = readAllText(filePath);
-				if(operations.size() > 0){
+
+				//S'il n'y pas eu de problème de lecture
+				if (operations.size() > 0) {
 					int reponse = repartiteur.handleOperations(operations);
-					System.out.println(reponse);
+					System.out.println("Réponse du répartiteur : " + reponse);
 				}
 			} catch (RemoteException e) {
 				System.err.println("Erreur: " + e.getMessage());
@@ -143,16 +143,17 @@ public class Client {
 	}
 
 	/**
-	 * Crée un compte utilisateur en demandant un nom d'utilisateur et un mot de
-	 * passe
+	 * Crée un compte utilisateur en demandant un nom d'utilisateur et un mot de passe
 	 */
 	private void createAccount() {
 		Scanner reader = new Scanner(System.in);
 		boolean validAccount = false;
+
 		while (!validAccount) {
 			String userName = "", pass = "";
 			System.out.println("Nom d'utilisateur : ");
 			boolean nameValid = false;
+
 			while (!nameValid) {
 				userName = reader.nextLine();
 				if (userName.length() <= 1) {
@@ -163,6 +164,7 @@ public class Client {
 			}
 			System.out.println("Mot de passe : ");
 			boolean passValid = false;
+
 			while (!passValid) {
 				pass = reader.nextLine();
 				if (pass.length() <= 2) {
@@ -200,8 +202,7 @@ public class Client {
 		reader.close();
 	}
 
-	// Fonction qui retourne tout le texte d'un fichier passé en paramètre sous f
-	// rme de ArrayList
+	// Fonction qui retourne tout le texte d'un fichier passé en paramètre sous forme de ArrayList
 	private static List<String> readAllText(String filePath) {
 		List<String> text = new ArrayList<String>();
 
