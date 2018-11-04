@@ -19,6 +19,7 @@ import java.util.List;
 import shared.Account;
 import shared.AuthServerInterface;
 import shared.CalculationServerInfo;
+import shared.PortsSettings;
 
 public class AuthServer implements AuthServerInterface {
 	//dossier où les comptes clients sont sauvegardés
@@ -51,9 +52,9 @@ public class AuthServer implements AuthServerInterface {
 	private void run() {
 		try {
 			AuthServerInterface stub = (AuthServerInterface) UnicastRemoteObject
-					.exportObject(this, 5000);
+					.exportObject(this, PortsSettings.authServerPort);
 
-			Registry registry = LocateRegistry.createRegistry(5000);
+			Registry registry = LocateRegistry.createRegistry(PortsSettings.authServerPort);
 			registry.rebind("authServer", stub);
 			System.out.println("Server ready.");
 		} catch (ConnectException e) {
