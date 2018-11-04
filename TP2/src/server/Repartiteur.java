@@ -265,34 +265,34 @@ public class Repartiteur implements RepartiteurInterface {
 			case "non-securise":
 
 				/*
-				*	Algorithm de repartiteur mode non-securise
+				*	Algorithme du répartiteur mode non-securisé
 
-				!!! REMARQUE: Algorithm est extendable pour le test entre 3...n serveurs en Overriding 
-				la fonction checkMalicious pour comparer plus de 2 resultats a chaque fois de maniere 
-				prefere, le reste est gere automatiquement
+				!!! REMARQUE: l'algorithme peut comparer le résultat de 2...n serveurs en modifiant la 
+				constante NUMBER_OF_CHECK_REQUIRED. La fonction checkMalicious va alors comparer le nombre 
+				de résultats choisis à chaque fois, le reste est géré automatiquement.
 
-				Il y a globalement 7 etapes: (le mot server calculation et serveur sont interchangeable)
-					1. Detecter les serveurs lonely
-					2. Isoler un serveur si le nombre total est impair
-					3. Map les serveurs lonely au partner de capacity la plus petite
-					4. Traiter les overheads ou prendre une partie des operations si necessaire		<-------
-					5. Donner les operations aux servers													|
-					6. Recuperer le resultat et mettre a cote les operations non valide						|
-					7. Si il reste des operations, revenir au 4e	-----------------------------------------
+				Il y a globalement 7 étapes: (ici par serveur nous entendons serveur de calcul)
+					1. Détecter les serveurs sans partenaires
+					2. Isoler un serveur si le nombre total de serveurs est impair
+					3. Associeer les serveurs sans partenaires au serveur de plus petite capacité
+					4. Traiter les overheads ou prendre une partie des opérations si necessaire
+					5. Donner les opérations aux serveurs
+					6. Récupérer le résultat et mettre de côté les résultats non valides
+					7. S'il reste des opérations, revenir à l'étape 4
 
-				Le detail de chaque etape:
-					1. Detecter les serveurs qui n'ont pas de partenaire de meme capacite
-					e.g. Si on veut tester le resultat entre 2 serveur, et il existe 3 serveurs de capacite 4
-					la 3e est un serveur "lonely"
+				Le détail de chaque étape:
+					1. Détecter les serveurs qui n'ont pas de partenaire de même capacité
+					e.g. Si on veut tester le résultat entre 2 serveurs et qu'il existe 3 serveurs de capacité 4
+					le 3e est un serveur sans partenaire
 					
-					2. Si le nombre total des serveurs sont impair, il y aura surement un serveur qui n'aura pas
-					de partenaire, meme si avec une capacite different, on cherche alors a isoler ce serveur pour
-					ce calcul, on isole alors le serveur la capacite la plus petite parmi les lonely
+					2. Si le nombre total des serveurs est impair, il y aura surement un serveur qui n'aura pas
+					de partenaire, même avec une capacité differente. On cherche alors à isoler ce serveur pour
+					le calcul. On isole le serveur avec la capacité minimale.
 
-					3. Comme on va comparer le resultat de 2 serveurs, ces 2 serveurs devraient faire les memes
-					operations, donc leur capacite doit etre egal. Car en 4e etape, on va calculer le nombre des
-					operations maximal pour chaque serveur pour que le taux de refus ne soit pas trop eleve. Donc
-					ici on cherche a "mapper" (i.e. remplacer) la capacite du serveur lonely par la capacite de
+					3. Comme on compare le résultat de 2 serveurs, ces 2 serveurs devraient faire les mêmes
+					opérations, leur capacité doit être similaire. Puisque à la 4e étape on va calculer le nombre
+					d'operation maximal pour chaque serveur assurant que le taux de refus ne soit pas trop élevé,
+					on cherche a "mapper" (i.e. remplacer) la capacite du serveur sans partenaire par la capacite de
 					sont partenaire qui est plus peite, cad on donne les operations pour que le taux de refus 
 					tf = min(tf1, tf2).
 						
@@ -360,7 +360,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		List<OperationTodo> remainingList = new ArrayList<>();
 
-		System.out.println("4. Traiter les overheads ou prendre une partie des operations si necessaire");
+		// 4. Traiter les overheads ou prendre une partie des operations si necessaire
 		if (list.size() > totalCapacity) {
 			double averageRefusePercent = (double) (list.size() - totalCapacity) / (4 * totalCapacity);
 			while (averageRefusePercent > TOLERANCE_REFUSE_RATE) {
@@ -377,14 +377,14 @@ public class Repartiteur implements RepartiteurInterface {
 
 		int temp = getResult(globalResultList, remainingList);
 		if (remainingList.size() > 0) {
-			System.out.println("7. Si il reste des operations, revenir au 4e");
+			// 7. Si il reste des operations, revenir au 4e
 			return temp + delegateHandleOperationNonSecurise(remainingList, checkFactor);
 		}
 		return temp;
 	}
 
 	private List<List<Future<Response>>> assignTasks(List<OperationTodo> list, int checkFactor) {
-		System.out.println("5. Donner les operations aux servers");
+		// 5. Donner les operations aux servers
 
 		int from = 0;
 		int i = 0;
@@ -458,9 +458,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private int getResult(List<List<Future<Response>>> globalResultList, List<OperationTodo> remainingList) {
 		int res = 0;
 		List<Future<Response>> result = globalResultList.get(0);
-		boolean check = globalResultList.size() == 1 ? false : true;
-		if (check)
-			System.out.println("6. Recuperer le resultat et mettre a cote les operations non valide");
+		boolean check = globalResultList.size() != 1;
+		// 6. Recuperer le resultat et mettre a cote les operations non valide
 		for (int i = 0; i < result.size(); i++) {
 			try {
 				if (!check) {
@@ -534,7 +533,6 @@ public class Repartiteur implements RepartiteurInterface {
 	private CalculationServerInterface detectLonelyServers(int checkFactor) {
 		// 1. Detecter les serveurs lonely
 
-		System.out.println("1. Detecter les serveurs lonely");
 		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
 
 		for (Map.Entry<Integer, Integer> entry : countCapacity.entrySet()) {
@@ -564,7 +562,7 @@ public class Repartiteur implements RepartiteurInterface {
 	private CalculationServerInterface isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers,
 			int checkFactor) {
 
-		System.out.println("2. Isoler un serveur si le nombre total est impair");
+		// 2. Isoler un serveur si le nombre total est impair
 		CalculationServerInterface idle = null;
 		if (calculationServers.size() % checkFactor != 0) {
 			idle = lonelyServers.get(0);
@@ -577,7 +575,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
 
-		System.out.println("3. Map les serveurs lonely au partner de capacity la plus petite");
+		// 3. Map les serveurs lonely au partner de capacity la plus petite
 
 		// Sort ascending la liste des lonely en fonction de capacite
 		Collections.sort(lonelyServers, new CalculationServerComparator());
