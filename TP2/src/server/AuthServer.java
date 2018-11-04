@@ -76,18 +76,18 @@ public class AuthServer implements AuthServerInterface {
 	 * retourne true si la création a réussie, sinon false
 	 */
 	@Override
-	public boolean newAccount(Account account) throws RemoteException {
+	public synchronized boolean newAccount(Account account) throws RemoteException {
 		return newAuth(account, ACCOUNTS_DIR_NAME);
 
 	}
 
 	@Override
-	public boolean newRepartiteur(Account account) throws RemoteException {
+	public synchronized boolean newRepartiteur(Account account) throws RemoteException {
 		return newAuth(account, REPARTITEURS_DIR_NAME);
 	}
 
 	@Override
-	public boolean loginRepartiteur(Account account) throws RemoteException {
+	public synchronized boolean loginRepartiteur(Account account) throws RemoteException {
 		boolean valid = verifyRepartiteur(account);
 		if(valid){
 			try {
@@ -103,7 +103,7 @@ public class AuthServer implements AuthServerInterface {
 		return false;
 	}
 
-	private boolean newAuth(Account account, String dirName){
+	private synchronized boolean newAuth(Account account, String dirName){
 		String filePath = dirName + "/" + account.userName;
 		File file = new File(filePath);
 		if(file.exists()) { 
@@ -123,7 +123,7 @@ public class AuthServer implements AuthServerInterface {
 	}
 
 	@Override
-	public boolean verifyAccount(Account account) throws RemoteException{
+	public synchronized boolean verifyAccount(Account account) throws RemoteException{
 		return verifyAuth(account, ACCOUNTS_DIR_NAME);
 	}
 
@@ -131,11 +131,11 @@ public class AuthServer implements AuthServerInterface {
 	 * Vérifie si le compte reçu existe et que le mot de passe est valide
 	 */
 	@Override
-	public boolean verifyRepartiteur(Account account) throws RemoteException {
+	public synchronized boolean verifyRepartiteur(Account account) throws RemoteException {
 		return verifyAuth(account, REPARTITEURS_DIR_NAME);
 	}
 
-	private boolean verifyAuth(Account account, String dirName){
+	private synchronized boolean verifyAuth(Account account, String dirName){
 		String filePath = dirName + "/" + account.userName;
 		String userName = "", validPass = "";
 
@@ -169,7 +169,7 @@ public class AuthServer implements AuthServerInterface {
 	}
 	
 	@Override
-	public boolean registerCalculationServer(CalculationServerInfo serverDescription) throws RemoteException{
+	public synchronized boolean registerCalculationServer(CalculationServerInfo serverDescription) throws RemoteException{
 		try {
 			String clientIp = RemoteServer.getClientHost();
 			serverDescription.ip = clientIp;
@@ -184,7 +184,7 @@ public class AuthServer implements AuthServerInterface {
 	}
 	
 	@Override
-	public List<CalculationServerInfo> getCalculationServers() throws RemoteException{
+	public synchronized List<CalculationServerInfo> getCalculationServers() throws RemoteException{
 		return serverDescriptions;
 	}
 }
