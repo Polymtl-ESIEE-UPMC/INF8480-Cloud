@@ -96,6 +96,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private AuthServerInterface authServer = null;
 	private List<CalculationServerInterface> calculationServers = null;
+	private CalculationServerInterface idle = null;
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
@@ -110,6 +111,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private TreeMap<Integer, Integer> countCapacity = null;
 	private Map<Integer, Integer> overheads;
 	private Map<Integer, Integer> dangerousOverheads;
+	private List<CalculationServerInterface> disconnectedServers = null;
+	private boolean handledDisconnected = true;
 
 	public Repartiteur(String authServerHostName) {
 		super();
@@ -130,6 +133,7 @@ public class Repartiteur implements RepartiteurInterface {
 		countCapacity = new TreeMap<>();
 		overheads = new HashMap<>();
 		dangerousOverheads = new HashMap<>();
+		disconnectedServers = new ArrayList<>();
 	}
 
 	private void run() {
@@ -180,6 +184,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 			System.out.println("Repartiteur ready. MODE: " + mode);
 		} catch (ConnectException e) {
+			
 			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
@@ -188,6 +193,9 @@ public class Repartiteur implements RepartiteurInterface {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		resetTrackingCapacity();
+		handleMode();
 	}
 
 	/**
@@ -245,15 +253,19 @@ public class Repartiteur implements RepartiteurInterface {
 	/*
 	 * Méthodes accessibles par RMI.
 	 */
-
 	@Override
 	public int handleOperations(List<String> operations) throws RemoteException {
-		resetTrackingCapacity();
-
+		System.out.println("BEGIN ===============================================");
 		List<OperationTodo> list = parseStringToOperations(operations);
+		int finalResult = handleOperations(list, null);
+		System.out.println("FINISH ===============================================");
+		System.out.println("");
+		return finalResult;
+	}
+
+	private int handleOperations(List<OperationTodo> list, Integer unused) {
 		int finalResult = 0;
 
-		System.out.println("BEGIN ===============================================");
 		switch (mode) {
 			case "securise":
 				/*
@@ -305,7 +317,7 @@ public class Repartiteur implements RepartiteurInterface {
 					Comme on veut tfm = tf1 = tf2 = ... = tfn
 					le Nbre d'operation de trop (overhead) = tfm * 4 * capacite
 					Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une somme "dangerous" pour 
-					redistribuer plus tard
+					redistribuer1 plus tard
 
 					5. Nbre d'operation = capcite + overhead + dangerous
 
@@ -314,29 +326,12 @@ public class Repartiteur implements RepartiteurInterface {
 					7. Si la liste remaining n'est pas vide, on revient a l'etape 4 avec cette liste comme param
 				*/
 
-				if (calculationServers.size() > 1) {
-					CalculationServerInterface idle = detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
-					updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
-
-					System.out.println("Current total capacity: " + totalCapacity);
-
-					finalResult = delegateHandleOperationNonSecurise(list, NUMBER_OF_CHECK_REQUIRED);
-
-					if (idle != null)
-						calculationServers.add(idle); // Undo modification
-
-				} else {
-					System.out.println("Il n'y a pas suffisamment de serveur de calcul");
-					System.out.println("Switch au mode securise automatiquement");
-					finalResult = delegateHandleOperationSecurise(list);
-				}
+				finalResult = delegateHandleOperationNonSecurise(list, NUMBER_OF_CHECK_REQUIRED);
 				break;
 
 			default:
-				throw new RemoteException("Erreur: mode non reconnu");
+				break;
 		}
-		System.out.println("FINISH ===============================================");
-		System.out.println("");
 
 		return finalResult % 4000;
 	}
@@ -357,6 +352,14 @@ public class Repartiteur implements RepartiteurInterface {
 	private int delegateHandleOperationNonSecurise(List<OperationTodo> list, int checkFactor) {
 
 		clearOverHeads();
+		if (disconnectedServers.size() > 0 && !handledDisconnected){
+			System.out.println("Nombre de serveur deconnecte: "+disconnectedServers.size());
+			resetTrackingCapacity();
+			handleDisconnected();
+			handleMode();
+			handledDisconnected = true;
+			return handleOperations(list, null);
+		}
 
 		List<OperationTodo> remainingList = new ArrayList<>();
 
@@ -439,17 +442,31 @@ public class Repartiteur implements RepartiteurInterface {
 		if (todos.size() > 0) {
 			customResult.add(executorService.submit(() -> { // lambda Java 8 feature
 				int res = 0;
+				boolean disconnect = false;
 
-				try {
-					do {
+				do {
+					try {
 						res = cs.calculateOperations(todos, account);
-					} while(res == -1);
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				} catch (OperationRefusedException e) {
-					e.printStackTrace();
-				}
+					} catch (ConnectException e) {
+						System.err.println();
+						System.err.println("Server failure");
+						System.err.println("Erreur: " + e.getMessage());
+
+						disconnectedServers.add(cs);
+						disconnect = true;
+						handledDisconnected = false;
+						break;
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					} catch (OperationRefusedException e) {
+						e.printStackTrace();
+					}
+				} while (res == -1);
+
 					
+				if(disconnect) {
+					return new Response(cs, todos, -1);
+				}
 				return new Response(cs, todos, res);
 			}));
 		}
@@ -486,7 +503,8 @@ public class Repartiteur implements RepartiteurInterface {
 	private boolean checkMalicious(int res, List<List<Future<Response>>> checkResultList, int index) {
 		List<Future<Response>> checkResult = checkResultList.get(0);
 		try {
-			if (res == checkResult.get(index).get().res)
+			int checkres = checkResult.get(index).get().res;
+			if (res == checkres && res != -1 && checkres != -1)
 				return true;
 		} catch (ExecutionException e) {
 			e.printStackTrace();
@@ -530,7 +548,24 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
-	private CalculationServerInterface detectLonelyServers(int checkFactor) {
+	private void handleMode(){
+		System.out.println("Handle mode");
+		if(mode == "non-securise"){
+			if (calculationServers.size() >= NUMBER_OF_CHECK_REQUIRED) {
+				detectLonelyServers(NUMBER_OF_CHECK_REQUIRED);
+				updateTrackingCapacity(NUMBER_OF_CHECK_REQUIRED);
+	
+			} else {
+				System.out.println("Il n'y a pas suffisamment de serveur de calcul");
+				System.out.println("Switch au mode securise automatiquement");
+				mode = "securise";
+			}
+		}
+		System.out.println("MODE: "+mode);
+		System.out.println("Nombre de serveur utilise: "+calculationServers.size());
+	}
+
+	private void detectLonelyServers(int checkFactor) {
 		// 1. Detecter les serveurs lonely
 
 		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
@@ -552,25 +587,22 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 
 		// 2. Isoler un serveur si le nombre total est impair
-		CalculationServerInterface idle = isolateIdleServerIfThereIs(lonelyServers, checkFactor);
+		isolateIdleServerIfThereIs(lonelyServers, checkFactor);
 		// 3. Map les serveurs lonely au partner de capacity la plus petite
 		mapLonelyServerToLowestPartner(lonelyServers, checkFactor);
 
-		return idle;
 	}
 
-	private CalculationServerInterface isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers,
+	private void isolateIdleServerIfThereIs(List<CalculationServerInterface> lonelyServers,
 			int checkFactor) {
 
 		// 2. Isoler un serveur si le nombre total est impair
-		CalculationServerInterface idle = null;
 		if (calculationServers.size() % checkFactor != 0) {
 			idle = lonelyServers.get(0);
 			lonelyServers.remove(idle);
 		}
 		if (idle != null)
 			calculationServers.remove(idle);
-		return idle;
 	}
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
@@ -594,6 +626,19 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 		// Sort descending pour donner les operations aux servers de gros capacite first
 		Collections.sort(calculationServers, new CalculationServerComparator(false));
+	}
+
+	private void handleDisconnected(){
+		System.out.println("Handle disconnected");
+		for(CalculationServerInterface cs: disconnectedServers){
+			calculationServers.remove(cs);
+			totalCapacity -= getCapacity(cs);
+			Integer temp = countCapacity.get(getCapacity(cs));
+			if(temp != null){
+				countCapacity.put(getCapacity(cs), temp-1);
+			}
+			virtualCapacity.put(cs, null);
+		}
 	}
 
 	private void syncCapacity() {
@@ -632,6 +677,10 @@ public class Repartiteur implements RepartiteurInterface {
 	private void resetTrackingCapacity() {
 		System.out.println("Reset state");
 
+		if(idle != null) {
+			calculationServers.add(idle);
+			idle = null;
+		}
 		totalCapacity = defaultTotalCapacity;
 		virtualCapacity.clear();
 		for (Map.Entry<CalculationServerInterface, Integer> entry : cacheCapacity.entrySet()) {
