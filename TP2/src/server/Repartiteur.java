@@ -548,6 +548,19 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 	}
 
+	private void handleDisconnected(){
+		System.out.println("Handle disconnected");
+		for(CalculationServerInterface cs: disconnectedServers){
+			calculationServers.remove(cs);
+			totalCapacity -= getCapacity(cs);
+			Integer temp = countCapacity.get(getCapacity(cs));
+			if(temp != null){
+				countCapacity.put(getCapacity(cs), temp-1);
+			}
+			virtualCapacity.put(cs, null);
+		}
+	}
+
 	private void handleMode(){
 		System.out.println("Handle mode");
 		if(mode == "non-securise"){
@@ -626,19 +639,6 @@ public class Repartiteur implements RepartiteurInterface {
 		}
 		// Sort descending pour donner les operations aux servers de gros capacite first
 		Collections.sort(calculationServers, new CalculationServerComparator(false));
-	}
-
-	private void handleDisconnected(){
-		System.out.println("Handle disconnected");
-		for(CalculationServerInterface cs: disconnectedServers){
-			calculationServers.remove(cs);
-			totalCapacity -= getCapacity(cs);
-			Integer temp = countCapacity.get(getCapacity(cs));
-			if(temp != null){
-				countCapacity.put(getCapacity(cs), temp-1);
-			}
-			virtualCapacity.put(cs, null);
-		}
 	}
 
 	private void syncCapacity() {
