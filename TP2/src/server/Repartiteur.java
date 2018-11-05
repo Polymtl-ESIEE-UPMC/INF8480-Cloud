@@ -96,7 +96,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private AuthServerInterface authServer = null;
 	private List<CalculationServerInterface> calculationServers = null;
-	private CalculationServerInterface idle = null;
+	private List<CalculationServerInterface> idles = null;
 	private final String userName = "tempName";
 	private final String password = "temppassword";
 	private Account account = null;
@@ -134,6 +134,7 @@ public class Repartiteur implements RepartiteurInterface {
 		overheads = new HashMap<>();
 		dangerousOverheads = new HashMap<>();
 		disconnectedServers = new ArrayList<>();
+		idles = new ArrayList<>();
 	}
 
 	private void run() {
@@ -281,7 +282,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 				!!! REMARQUE: l'algorithme peut comparer le résultat de 2...n serveurs en modifiant la 
 				constante NUMBER_OF_CHECK_REQUIRED. La fonction checkMalicious va alors comparer le nombre 
-				de résultats choisis à chaque fois, le reste est géré automatiquement.
+				de résultats choisis à chaque fois (nécessite de réimplémenter), le reste est géré automatiquement.
 
 				Il y a globalement 7 étapes: (ici par serveur nous entendons serveur de calcul)
 					1. Détecter les serveurs sans partenaires
@@ -619,12 +620,17 @@ public class Repartiteur implements RepartiteurInterface {
 			int checkFactor) {
 
 		// 2. Isoler un serveur si le nombre total est impair
-		if (calculationServers.size() % checkFactor != 0) {
-			idle = lonelyServers.get(0);
-			lonelyServers.remove(idle);
+		int to_isolate = calculationServers.size() % checkFactor;
+		if (to_isolate != 0) {
+			for(int i=0; i<to_isolate; i++){
+				CalculationServerInterface idle = lonelyServers.get(0);
+				idles.add(idle);
+				lonelyServers.remove(idle);
+			}
 		}
-		if (idle != null)
+		for(CalculationServerInterface idle:idles){
 			calculationServers.remove(idle);
+		}
 	}
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
@@ -686,10 +692,10 @@ public class Repartiteur implements RepartiteurInterface {
 	private void resetTrackingCapacity() {
 		System.out.println("Reset state");
 
-		if(idle != null) {
+		for(CalculationServerInterface idle:idles){
 			calculationServers.add(idle);
-			idle = null;
 		}
+		idles.clear();
 		totalCapacity = defaultTotalCapacity;
 		virtualCapacity.clear();
 		for (Map.Entry<CalculationServerInterface, Integer> entry : cacheCapacity.entrySet()) {
