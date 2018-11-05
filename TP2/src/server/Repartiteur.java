@@ -339,8 +339,12 @@ public class Repartiteur implements RepartiteurInterface {
 	private List<OperationTodo> parseStringToOperations(List<String> operations) {
 		List<OperationTodo> list = new ArrayList<>();
 		for (String op : operations) {
-			String[] algo = op.split(" ");
-			list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
+			try {
+				String[] algo = op.split(" ");
+				list.add(new OperationTodo(algo[0], Integer.parseInt(algo[1])));
+			} catch (Exception e) {
+				System.err.println("Operation non reconnue: " + op);
+			}
 		}
 		return list;
 	}
@@ -479,10 +483,15 @@ public class Repartiteur implements RepartiteurInterface {
 		// 6. Recuperer le resultat et mettre a cote les operations non valide
 		for (int i = 0; i < result.size(); i++) {
 			try {
+				Response response = result.get(i).get();
 				if (!check) {
-					res = (res + result.get(i).get().res) % 4000;
+					if (response.res != -1) {
+						res = (res + response.res) % 4000;
+					} else {
+						remainingList.addAll(response.operations);
+					}
+
 				} else {
-					Response response = result.get(i).get();
 					int temp = response.res;
 					List<List<Future<Response>>> checkResultList = globalResultList.subList(1, globalResultList.size());
 					if (checkMalicious(temp, checkResultList, i)) {
