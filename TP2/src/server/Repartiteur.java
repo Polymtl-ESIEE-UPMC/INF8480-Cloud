@@ -368,7 +368,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		List<OperationTodo> remainingList = new ArrayList<>();
 
-		// 4. Traiter les overheads ou prendre une partie des operations si necessaire
+		// 4. Traiter les overheads ou prendre une partie des opérations si nécessaire
 		if (list.size() > totalCapacity) {
 			double averageRefusePercent = (double) (list.size() - totalCapacity) / (4 * totalCapacity);
 			while (averageRefusePercent > TOLERANCE_REFUSE_RATE) {
@@ -385,14 +385,14 @@ public class Repartiteur implements RepartiteurInterface {
 
 		int temp = getResult(globalResultList, remainingList);
 		if (remainingList.size() > 0) {
-			// 7. Si il reste des operations, revenir au 4e
+			// 7. Si il reste des opérations, revenir à l'étape 4
 			return temp + delegateHandleOperationNonSecurise(remainingList, checkFactor);
 		}
 		return temp;
 	}
 
 	private List<List<Future<Response>>> assignTasks(List<OperationTodo> list, int checkFactor) {
-		// 5. Donner les operations aux servers
+		// 5. Donner les opérations aux serveurs
 
 		int from = 0;
 		int i = 0;
@@ -481,7 +481,7 @@ public class Repartiteur implements RepartiteurInterface {
 		int res = 0;
 		List<Future<Response>> result = globalResultList.get(0);
 		boolean check = globalResultList.size() != 1;
-		// 6. Recuperer le resultat et mettre a cote les operations non valide
+		// 6. Recuperer le résultat et mettre à côté les opérations non valides
 		for (int i = 0; i < result.size(); i++) {
 			try {
 				Response response = result.get(i).get();
@@ -589,7 +589,7 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private void detectLonelyServers(int checkFactor) {
-		// 1. Detecter les serveurs sans partenaire
+		// 1. Détecter les serveurs sans partenaire
 
 		List<CalculationServerInterface> lonelyServers = new ArrayList<>();
 
@@ -611,7 +611,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 		// 2. Isoler un serveur si le nombre total est impair
 		isolateIdleServerIfThereIs(lonelyServers, checkFactor);
-		// 3. Map les serveurs sans partenaire au partenaire ayant la capacite plus petite
+		// 3. Map les serveurs sans partenaire au partenaire ayant la capacité la plus petite
 		mapLonelyServerToLowestPartner(lonelyServers, checkFactor);
 
 	}
@@ -634,7 +634,7 @@ public class Repartiteur implements RepartiteurInterface {
 
 	private void mapLonelyServerToLowestPartner(List<CalculationServerInterface> lonelyServers, int checkFactor) {
 
-		// Sort en ordre croissant la liste des lonely en fonction de capacite
+		// Trie en ordre croissant la liste des serveurs sans partenaire en fonction de leur capacité
 		Collections.sort(lonelyServers, new CalculationServerComparator());
 		for (int i = 0; i < lonelyServers.size(); i += checkFactor) {
 			int lowestCapacity = getCapacity(lonelyServers.get(i));
@@ -649,12 +649,12 @@ public class Repartiteur implements RepartiteurInterface {
 				currentValue = 0;
 			countCapacity.put(lowestCapacity, currentValue + checkFactor);
 		}
-		// Sort en ordre decroissant pour donner les operations aux servers de gros capacite premierement
+		// Trie en ordre décroissant pour donner les opérations aux serveurs de grosse capacité en premier
 		Collections.sort(calculationServers, new CalculationServerComparator(false));
 	}
 
 	private void syncCapacity() {
-		// Mettre a jour la capacite reelle de chaque serveur, si le cache est non-valide, appel RMI
+		// Mettre à jour la capacité réelle de chaque serveur. Si la cache est non-valide, appel RMI
 		for (CalculationServerInterface cs : calculationServers) {
 			Integer capacity = cacheCapacity.get(cs);
 			if (capacity == null) {
@@ -671,7 +671,7 @@ public class Repartiteur implements RepartiteurInterface {
 	}
 
 	private int getCapacity(CalculationServerInterface cs) {
-		// retourner la capacite virutelle actuellement utilise. Si non-trouve -> sync
+		// retourner la capacité virtuelle présentement utilisée. Si non-trouvée, on synchronise
 		Integer capacity = virtualCapacity.get(cs);
 		if (capacity != null) {
 			syncCapacity();
