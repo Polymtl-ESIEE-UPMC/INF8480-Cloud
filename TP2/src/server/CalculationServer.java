@@ -43,6 +43,7 @@ public class CalculationServer implements CalculationServerInterface {
 						break;
 					default:
 						System.err.println("Mauvaise commande : " + args[i]);
+						printHelp();
 						return;
 					}
 				} catch (IndexOutOfBoundsException | NumberFormatException e) {
