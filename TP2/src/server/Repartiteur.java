@@ -304,27 +304,27 @@ public class Repartiteur implements RepartiteurInterface {
 
 					3. Comme on compare le résultat de 2 serveurs, ces 2 serveurs devraient faire les mêmes
 					opérations, leur capacité doit être similaire. Puisque à la 4e étape on va calculer le nombre
-					d'operation maximal pour chaque serveur assurant que le taux de refus ne soit pas trop élevé,
-					on cherche a "mapper" (i.e. remplacer) la capacite du serveur sans partenaire par la capacite de
-					sont partenaire qui est plus petite, cad on donne les operations pour que le taux de refus 
-					tf = min(tf1, tf2).
+					d'opération maximal pour chaque serveur qui assure que le taux de refus ne soit pas trop élevé,
+					on cherche à remplacer la capacité du serveur sans partenaire par la capacité de
+					son partenaire qui est la plus petite.
 						
-					4. On decide le nombre d'operations de trop pour chaque serveur en fonction de sa capacite
-					On a le taux de refus moyen tfm = (Nbre operations - totalCapacity/2) / (4 * totalCapacity/2)
-					(comme 2 servers fait la meme chose a chaque fois, donc la capacite /2)
-					D'abord on veut que le tfm < SEUIL, si tfm > SEUIL, on mettre quelque operation dans une liste
-					a cote pour faire plus tard (remainingList) et recalcule tfm
-					Une fois qu'on a la liste a faire des operatoins, on calcule le nombre d'operation pour chaque
+					4. On décide le nombre d'opérations de trop pour chaque serveur en fonction de sa capacité.
+					On a le taux de refus moyen tfm = (Nbre opérations - totalCapacity/2) / (4 * totalCapacity/2)
+					(puisque 2 servers font la même chose à chaque fois, la capacité est diminuée de moitié)
+					D'abord on veut que le tfm < SEUIL, si tfm > SEUIL, on met quelques opérations dans une liste
+					à côté pour traiter plus tard (remainingList) et on recalcule le taux de refus moyen (tfm).
+					Une fois qu'on a la liste des operatoins à faire, on calcule le nombre d'opération pour chaque
 					Comme on veut tfm = tf1 = tf2 = ... = tfn
-					le Nbre d'operation de trop (overhead) = tfm * 4 * capacite
-					Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 a` une somme "dangerousOverhead" pour 
-					redistribuer1 plus tard
+					le Nbre d'opération de trop (overhead) = tfm * 4 * capacité
+					Si par exemple c'est 3.4, on prend donc 3 et rajoute 0.4 à une somme "dangerousOverhead" pour 
+					redistribuer plus tard
 
-					5. Nbre d'operation = capcite + overhead + dangerous
+					5. Nombre d'opérations = capcité + overhead + dangerous
 
-					6. On recupere et test le resultat, si ce n'est pas valide on rajoute a la remainingList
+					6. On récupère et teste le résultat, s'il n'est pas valide (malicieux), 
+					on le remet dans la liste opérations restante.
 
-					7. Si la remainingList n'est pas vide, on revient a l'etape 4 avec cette liste comme parametre
+					7. Si la remainingList n'est pas vide, on revient à l'étape 4 avec cette liste comme parametre
 				*/
 
 				finalResult = delegateHandleOperationNonSecurise(list, NUMBER_OF_CHECK_REQUIRED);
