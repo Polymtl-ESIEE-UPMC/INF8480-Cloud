@@ -1,3 +1,7 @@
+#https://docs.openstack.org/heat/latest/template_guide/hot_spec.html
+#https://docs.openstack.org/heat/mitaka/template_guide/openstack.html
+#https://docs.openstack.org/heat/latest/template_guide/hot_spec.html
+#https://www.codingame.com/start
 heat_template_version: 2014-10-16
 
 description: A template to deploy a load balanced web server
@@ -8,16 +12,33 @@ parameters:
     type: string
     description: Image utilisee pour les serveurs
     #A completer
+    default: INF4410-Ubuntu-trusty-mini
+    constraints:
+      - custom_constraint: glance.image
 
   flavor:
     type: string
     description: Flavor utilisee par les serveurs
     #A completer
+    default: INF4410-mini
+    constraints:
+      - custom_constraint: nova.flavor
 
   subnet_id:
     type: string
     description: Sous-reseau dans lequel le load balancer sera situe
     #A completer
+    default: 6579eb07-88c3-4707-9c6e-ab90a78cca02
+
+  key_name:
+    type: string
+    description: j'ai aucune idée c'est quoi
+    default: TP1
+
+  network:
+    type: string
+    description: woah
+    default: inf4410-net
 
     # Vous pouvez ajouter d'autres paramètres
     # Il faut bien définir les descriptions, les valeurs par default et les contraintes
@@ -25,22 +46,46 @@ parameters:
 resources:
   server_nodes:
       type: OS::Heat::ResourceGroup
-      properties:
       #A completer
+      properties:
+      count: 2
+        resource_def:
+          type: OS::Nova::Server
+          properties:
+            # create a unique name for each server
+            # using its index in the group
+            name: Server
+            key_name: { get_param: key_name }
+            image: { get_param: image }
+            flavor: { get_param: flavor }
+            networks: [{network: {get_param: network} }]
 
 
   mypool:
       type: OS::Neutron::Pool
       #A completer
+      properties:
+        lb_method: ROUND_ROBIN
+        protocol: TCP
+        subnet: { get_param: subnet_id }
+        vip:
+          protocol_port: 80
 
   myloadbalancer:
       type: OS::Neutron::LoadBalancer
       #A completer
+      properties:
+        pool_id: 42
+        protocol_port: 8000
 
   mymonitor:
       type: OS::Neutron::HealthMonitor
-      properties:
       #A completer
+      properties:
+        type: PING
+        delay: 15000
+        max_retries: 2
+        timeout: 5000
 
 
 outputs:
