@@ -2,6 +2,7 @@
 #https://docs.openstack.org/heat/mitaka/template_guide/openstack.html
 #https://docs.openstack.org/heat/latest/template_guide/hot_spec.html
 #https://www.codingame.com/start
+#EZDg9Ss99
 heat_template_version: 2014-10-16
 
 description: A template to deploy a load balanced web server
