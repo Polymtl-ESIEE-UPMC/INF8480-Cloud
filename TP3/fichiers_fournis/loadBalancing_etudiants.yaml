@@ -1,0 +1,49 @@
+heat_template_version: 2014-10-16
+
+description: A template to deploy a load balanced web server
+
+parameters:
+
+  image:
+    type: string
+    description: Image utilisee pour les serveurs
+    #A completer
+
+  flavor:
+    type: string
+    description: Flavor utilisee par les serveurs
+    #A completer
+
+  subnet_id:
+    type: string
+    description: Sous-reseau dans lequel le load balancer sera situe
+    #A completer
+
+    # Vous pouvez ajouter d'autres paramètres
+    # Il faut bien définir les descriptions, les valeurs par default et les contraintes
+
+resources:
+  server_nodes:
+      type: OS::Heat::ResourceGroup
+      properties:
+      #A completer
+
+
+  mypool:
+      type: OS::Neutron::Pool
+      #A completer
+
+  myloadbalancer:
+      type: OS::Neutron::LoadBalancer
+      #A completer
+
+  mymonitor:
+      type: OS::Neutron::HealthMonitor
+      properties:
+      #A completer
+
+
+outputs:
+  pool_ip_address:
+    value: {get_attr: [mypool, vip, address]}
+    description: The IP address of the load balancing pool
