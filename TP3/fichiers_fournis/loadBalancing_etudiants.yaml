@@ -30,11 +30,15 @@ parameters:
     description: Sous-reseau dans lequel le load balancer sera situe
     #A completer
     default: 6579eb07-88c3-4707-9c6e-ab90a78cca02
+    constraints:
+      - custom_constraint: neutron.subnet
 
   key_name:
     type: string
     description: j'ai aucune idée c'est quoi
     default: TP1
+    constraints:
+      - custom_constraint: nova.keypair
 
   network:
     type: string
@@ -49,17 +53,21 @@ resources:
       type: OS::Heat::ResourceGroup
       #A completer
       properties:
-      count: 2
+        count: 2
         resource_def:
           type: OS::Nova::Server
           properties:
             # create a unique name for each server
             # using its index in the group
-            name: Server
+            name: Server%index%
             key_name: { get_param: key_name }
             image: { get_param: image }
             flavor: { get_param: flavor }
             networks: [{network: {get_param: network} }]
+            user_data_format: RAW
+            user_data: |
+              wget https://raw.githubusercontent.com/houssemmh/INF8480-TP3/master/server.py
+              python server.py
 
 
   mypool:
