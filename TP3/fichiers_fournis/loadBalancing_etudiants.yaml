@@ -45,8 +45,14 @@ parameters:
     description: woah
     default: inf4410-net
 
-    # Vous pouvez ajouter d'autres paramètres
-    # Il faut bien définir les descriptions, les valeurs par default et les contraintes
+  ext_subnet_id:
+    type: string
+    default: 0c3b1354-d3d5-4fec-86d3-19d4d1f13785
+
+  scriptlink:
+    type: string
+    description: lien vers le script python
+    default: https://raw.githubusercontent.com/houssemmh/INF8480-TP3/master/server.py
 
 resources:
   server_nodes:
@@ -65,36 +71,48 @@ resources:
             flavor: { get_param: flavor }
             networks: [{network: {get_param: network} }]
             user_data_format: RAW
-            user_data: |
-              wget https://raw.githubusercontent.com/houssemmh/INF8480-TP3/master/server.py
-              python server.py
-
+            user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  wget scriptlink
+                  python server.py
+                params:
+                  scriptlink: {get_param: scriptlink}
 
   mypool:
       type: OS::Neutron::Pool
       #A completer
       properties:
         lb_method: ROUND_ROBIN
+        monitors: [{ get_resource: mymonitor }]
         protocol: TCP
         subnet: { get_param: subnet_id }
         vip:
-          protocol_port: 80
+          protocol_port: 8080
 
   myloadbalancer:
       type: OS::Neutron::LoadBalancer
       #A completer
       properties:
-        pool_id: 42
-        protocol_port: 8000
+        members: { get_attr: [server_nodes, refs] }
+        pool_id: { get_resource: mypool }
+        protocol_port: 8080
+  
+  adresseipflottante:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: ext_subnet_id }
+      port_id: { get_attr: [mypool, vip, port_id] }
 
   mymonitor:
       type: OS::Neutron::HealthMonitor
       #A completer
       properties:
         type: PING
-        delay: 15000
+        delay: 15
         max_retries: 2
-        timeout: 5000
+        timeout: 5
 
 
 outputs:
