@@ -12,7 +12,6 @@ parameters:
   image:
     type: string
     description: Image utilisee pour les serveurs
-    #A completer
     default: INF4410-Ubuntu-trusty-mini
     constraints:
       - custom_constraint: glance.image
@@ -20,7 +19,6 @@ parameters:
   flavor:
     type: string
     description: Flavor utilisee par les serveurs
-    #A completer
     default: INF4410-mini
     constraints:
       - custom_constraint: nova.flavor
@@ -28,7 +26,6 @@ parameters:
   subnet_id:
     type: string
     description: Sous-reseau dans lequel le load balancer sera situe
-    #A completer
     default: 6579eb07-88c3-4707-9c6e-ab90a78cca02
     constraints:
       - custom_constraint: neutron.subnet
@@ -36,7 +33,7 @@ parameters:
   key_name:
     type: string
     description: j'ai aucune idée c'est quoi
-    default: TP1
+    default: TP3
     constraints:
       - custom_constraint: nova.keypair
 
@@ -57,7 +54,6 @@ parameters:
 resources:
   server_nodes:
       type: OS::Heat::ResourceGroup
-      #A completer
       properties:
         count: 2
         resource_def:
@@ -82,7 +78,6 @@ resources:
 
   mypool:
       type: OS::Neutron::Pool
-      #A completer
       properties:
         lb_method: ROUND_ROBIN
         monitors: [{ get_resource: mymonitor }]
@@ -93,7 +88,6 @@ resources:
 
   myloadbalancer:
       type: OS::Neutron::LoadBalancer
-      #A completer
       properties:
         members: { get_attr: [server_nodes, refs] }
         pool_id: { get_resource: mypool }
@@ -107,7 +101,6 @@ resources:
 
   mymonitor:
       type: OS::Neutron::HealthMonitor
-      #A completer
       properties:
         type: PING
         delay: 15
