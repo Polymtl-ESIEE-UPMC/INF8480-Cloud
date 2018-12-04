@@ -34,11 +34,12 @@ parameters:
 
   network:
     type: string
-    description: woah
+    description: nom du sous-réseau
     default: inf4410-net
 
   ext_subnet_id:
     type: string
+    description: id du sous-réseau externe
     default: 0c3b1354-d3d5-4fec-86d3-19d4d1f13785
 
   scriptlink:
